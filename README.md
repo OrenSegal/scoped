@@ -33,11 +33,28 @@ Running more than one Claude Code session against the same codebase is now norma
 
 ## Setup
 
+Requires Node.js ≥22.5 (for the built-in `node:sqlite`) and the `claude` CLI on your `PATH`.
+
 ```bash
+git clone https://github.com/OrenSegal/scoped.git
+cd scoped
 npm install
+npm run setup
 ```
 
-**1. MCP server** — add to your MCP config (e.g. `.claude/settings.json` or your client's `mcpServers` block):
+`npm run setup` (`scripts/install.mjs`) does both of the steps below for you, and is safe to re-run — it checks for an existing entry before adding anything, so it never duplicates config or clobbers unrelated settings:
+
+1. Registers the MCP server with `claude mcp add scoped --scope user -- node <repo>/src/index.mjs`.
+2. Merges a `SessionStart` and a `PreToolUse` hook into the *global* `~/.claude/settings.json` (not a per-project one — the whole point is coordination across repos and worktrees, not just within one).
+
+Restart any running Claude Code sessions afterward so they pick up the new MCP server and hooks. To remove everything scoped added, run `npm run uninstall` (`scripts/uninstall.mjs`) — it only touches the entries it created, leaving the rest of your settings untouched.
+
+Optionally set `SCOPED_ISSUE_ID` (e.g. `ENG-123`) in a session's environment before launching it, so the hook's auto-claims group under the real issue instead of a synthetic `adhoc:<session>` bucket. For Linear visibility comments, set `LINEAR_API_KEY` in the MCP server's environment (`claude mcp add ... -e LINEAR_API_KEY=...`, or edit the entry `npm run setup` created).
+
+<details>
+<summary>Manual setup (if you'd rather not run the install script, or the <code>claude</code> CLI isn't on your PATH)</summary>
+
+**1. MCP server** — add to your MCP config (e.g. via `claude mcp add`, or your client's `mcpServers` block):
 
 ```json
 {
@@ -51,7 +68,7 @@ npm install
 }
 ```
 
-**2. Hooks** — register both in the *global* `~/.claude/settings.json` (not a per-project one), since the whole point is coordination across repos and worktrees, not just within one:
+**2. Hooks** — add both to the *global* `~/.claude/settings.json`:
 
 ```json
 {
@@ -69,7 +86,15 @@ npm install
 }
 ```
 
-Optionally set `SCOPED_ISSUE_ID` (e.g. `ENG-123`) in a session's environment before launching it, so the hook's auto-claims group under the real issue instead of a synthetic `adhoc:<session>` bucket.
+If a `PreToolUse` or `SessionStart` array already exists in your settings, append these entries to it rather than replacing the array — each event's hooks all run.
+
+</details>
+
+## Troubleshooting
+
+- **Edits aren't being blocked / claims never show up.** Confirm both hooks landed: `claude mcp list` should show `scoped`, and `~/.claude/settings.json` should have `hooks.SessionStart` and `hooks.PreToolUse` entries pointing at this repo's `hooks/` scripts. Hooks only take effect in sessions started *after* they were registered — restart the session.
+- **`claim`/`release` calls fail with a missing `session_id`.** The `SessionStart` hook injects it into context at session start; if the session was already running before you ran `npm run setup`, restart it.
+- **Nothing happens and there's no error.** The hook fails open by design — check its stderr (Claude Code surfaces hook stderr in its debug/transcript output) rather than assuming silence means success.
 
 **Performance note:** the hook adds one Node process start (roughly tens of milliseconds) to every Edit/Write/NotebookEdit call. Measured against 500 concurrent claims in the table, `check()` (which reaps first) averages ~0.2ms — the cost is process startup, not the lock. Worth it for correctness on a shared codebase — mention it if it ever feels laggy on an unusually edit-heavy loop.
 

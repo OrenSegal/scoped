@@ -12,7 +12,9 @@
   },
   "scripts": {
     "start": "node src/index.mjs",
-    "dev": "node --watch src/index.mjs"
+    "dev": "node --watch src/index.mjs",
+    "setup": "node scripts/install.mjs",
+    "uninstall": "node scripts/uninstall.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
