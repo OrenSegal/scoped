@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.2.1
+
+- Audited `src/linear.mjs`'s `commentCreate` call: confirmed against Linear's GraphQL schema that `CommentCreateInput.issueId` accepts either a UUID or a human-readable issue identifier (e.g. `ENG-123`), so passing the identifier through untouched is correct — no fix needed, documented in code.
+- Added test coverage (`test/linear.test.mjs`) for the Linear notify request-building logic, mocking `fetch` — covers enabled/disabled gating, request shape, identifier pass-through, and non-fatal error handling.
+
 ## v0.2.0
 
 - Real `PreToolUse` enforcement: auto-claims unclaimed files, denies edits from a conflicting session.
