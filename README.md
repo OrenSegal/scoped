@@ -36,7 +36,7 @@ Running more than one Claude Code session against the same codebase is now norma
 
 ## Setup
 
-Requires Node.js ≥22.5 (for the built-in `node:sqlite`) and the `claude` CLI on your `PATH`.
+Requires Node.js ≥22.13 (or ≥23.4 on the odd-numbered line) and the `claude` CLI on your `PATH`. `node:sqlite` exists from Node 22.5, but stayed behind `--experimental-sqlite` until 22.13/23.4 — scoped never passes that flag when it runs the server or hooks, so 22.5–22.12 will hit `ERR_UNKNOWN_BUILTIN_MODULE`.
 
 ```bash
 git clone https://github.com/OrenSegal/scoped.git
