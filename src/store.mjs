@@ -6,6 +6,14 @@ import fs from "node:fs";
 const DEFAULT_TTL_SECONDS = 4 * 60 * 60; // 4h: long enough for a real session, short enough that a crash self-heals
 const HOSTNAME = os.hostname();
 
+// The PreToolUse hook and the MCP tools are separate processes with separate working
+// directories. Both must key claims on the same string for the same file, or a claim made
+// one way is invisible to a check made the other way. Absolute paths are that common key —
+// callers may pass relative paths (resolved against `cwd`), but everything is stored absolute.
+function normalize(filePath, cwd) {
+  return path.isAbsolute(filePath) ? filePath : path.resolve(cwd ?? process.cwd(), filePath);
+}
+
 function defaultDbPath() {
   const dir = path.join(os.homedir(), ".scoped");
   fs.mkdirSync(dir, { recursive: true });
@@ -31,47 +39,74 @@ export class ClaimStore {
 
   // Deletes claims that are provably dead: expired by TTL, or (same host + pid no longer running).
   // Cross-host claims can only be reaped by TTL — we have no way to check a remote pid's liveness.
+  // TTL expiry is one indexed DELETE regardless of table size. Pid-liveness needs a per-row
+  // syscall, so it only scans this host's still-live-by-TTL rows, not the whole table.
   _reap() {
     const now = Math.floor(Date.now() / 1000);
-    const rows = this.db.prepare(`SELECT file_path, pid, hostname, claimed_at, ttl_seconds FROM claims`).all();
-    const dead = [];
-    for (const row of rows) {
-      const expired = row.claimed_at + row.ttl_seconds < now;
-      const deadLocal = row.hostname === HOSTNAME && row.pid != null && !isPidAlive(row.pid);
-      if (expired || deadLocal) dead.push(row.file_path);
-    }
-    if (dead.length) {
+    const ttlDead = this.db
+      .prepare(`DELETE FROM claims WHERE claimed_at + ttl_seconds < ? RETURNING file_path`)
+      .all(now)
+      .map((r) => r.file_path);
+
+    const localRows = this.db
+      .prepare(`SELECT file_path, pid FROM claims WHERE hostname = ? AND pid IS NOT NULL`)
+      .all(HOSTNAME);
+    const pidDead = localRows.filter((r) => !isPidAlive(r.pid)).map((r) => r.file_path);
+    if (pidDead.length) {
       const stmt = this.db.prepare(`DELETE FROM claims WHERE file_path = ?`);
-      for (const fp of dead) stmt.run(fp);
+      for (const fp of pidDead) stmt.run(fp);
     }
-    return dead;
+
+    return [...ttlDead, ...pidDead];
   }
 
   // Attempts to claim each file path for issueId/sessionId. Returns { claimed: [...], conflicts: [{file_path, held_by}] }.
-  claim(issueId, filePaths, sessionId, ttlSeconds = DEFAULT_TTL_SECONDS) {
+  // A file already held by this same sessionId is treated as already-claimed (idempotent), regardless of
+  // issue_id — a session's own ownership is what matters for collision safety, not which issue it's filed under.
+  //
+  // `pid`: defaults to process.pid (this process, running for as long as the caller runs — true for the
+  // long-lived MCP server, whose exit is a real liveness signal). Pass pid: null when the caller is a
+  // short-lived process (the PreToolUse hook exits right after each call) — a dead hook pid would otherwise
+  // get every claim it made reaped on the very next check. Those claims fall back to TTL-only expiry instead.
+  claim(issueId, filePaths, sessionId, ttlSeconds = DEFAULT_TTL_SECONDS, cwd, pid = process.pid) {
     this._reap();
     const now = Math.floor(Date.now() / 1000);
     const claimed = [];
     const conflicts = [];
+    // ON CONFLICT DO NOTHING makes the check-and-insert atomic in one statement — two hook
+    // processes racing on the same file_path can no longer both see "unclaimed" and both insert.
+    // Exactly one INSERT wins (changes === 1); the loser reads back who actually holds it.
     const insert = this.db.prepare(`
       INSERT INTO claims (file_path, issue_id, session_id, pid, hostname, claimed_at, ttl_seconds)
       VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(file_path) DO NOTHING
     `);
     const select = this.db.prepare(`SELECT issue_id, session_id FROM claims WHERE file_path = ?`);
-    for (const fp of filePaths) {
-      const existing = select.get(fp);
-      if (existing) {
-        if (existing.session_id === sessionId && existing.issue_id === issueId) {
-          claimed.push(fp); // idempotent: same session re-claiming its own file
-        } else {
-          conflicts.push({ file_path: fp, held_by: { issue_id: existing.issue_id, session_id: existing.session_id } });
-        }
+    for (const rawFp of filePaths) {
+      const fp = normalize(rawFp, cwd);
+      const result = insert.run(fp, issueId, sessionId, pid, HOSTNAME, now, ttlSeconds);
+      if (result.changes === 1) {
+        claimed.push(fp);
         continue;
       }
-      insert.run(fp, issueId, sessionId, process.pid, HOSTNAME, now, ttlSeconds);
-      claimed.push(fp);
+      // Lost the race (or it already existed before this call) — read back the actual owner.
+      const existing = select.get(fp);
+      if (existing.session_id === sessionId) {
+        claimed.push(fp); // idempotent: same session already owns this file
+      } else {
+        conflicts.push({ file_path: fp, held_by: { issue_id: existing.issue_id, session_id: existing.session_id } });
+      }
     }
     return { claimed, conflicts };
+  }
+
+  // Bumps claimed_at to now for a file this session already owns, extending its TTL without touching pid
+  // tracking. The hook calls this on every edit to a file it already claimed, so an actively-worked file
+  // never expires mid-session while an abandoned one still ages out.
+  touch(filePath, sessionId, cwd) {
+    const fp = normalize(filePath, cwd);
+    const now = Math.floor(Date.now() / 1000);
+    this.db.prepare(`UPDATE claims SET claimed_at = ? WHERE file_path = ? AND session_id = ?`).run(now, fp, sessionId);
   }
 
   // Releases every claim held under issueId. If sessionId is given, only releases that session's claims.
@@ -88,11 +123,12 @@ export class ClaimStore {
   }
 
   // Returns the active claim on a file, or null.
-  check(filePath) {
+  check(filePath, cwd) {
     this._reap();
+    const fp = normalize(filePath, cwd);
     const row = this.db
       .prepare(`SELECT file_path, issue_id, session_id, claimed_at, ttl_seconds FROM claims WHERE file_path = ?`)
-      .get(filePath);
+      .get(fp);
     return row ?? null;
   }
 

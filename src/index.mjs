@@ -2,15 +2,20 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import crypto from "node:crypto";
 import { ClaimStore } from "./store.mjs";
 import { notify } from "./linear.mjs";
 
-// One session id per server process. A Claude Code session spawns one MCP server process,
-// so this identifies "which agent" for the lifetime of that session.
-const SESSION_ID = process.env.SCOPED_SESSION_ID ?? crypto.randomUUID().slice(0, 8);
-
 const store = new ClaimStore();
+
+// There is no session identity Claude Code hands an MCP server subprocess (no shared env var
+// with the session_id a hook receives), so this server can't invent one that would agree with
+// the PreToolUse hook's enforcement. Instead, session_id is a required argument on every call —
+// scoped's SessionStart hook injects the real value into context at session start, and the
+// model is told to pass it through, so explicit claims here and automatic hook enforcement
+// resolve to the same owner for the same session.
+const SESSION_ID_SCHEMA = z
+  .string()
+  .describe("The scoped session_id given to you in context at session start (from scoped's SessionStart hook). Required so this claim matches the PreToolUse hook's enforcement for your session.");
 
 const server = new McpServer({
   name: "scoped",
@@ -19,18 +24,21 @@ const server = new McpServer({
 
 server.tool(
   "claim",
-  "Register intent to edit one or more files, scoped to a Linear issue id. Call this BEFORE editing. " +
+  "Register intent to edit one or more files, scoped to a Linear issue id. Call this BEFORE editing files you " +
+    "haven't touched yet in this session — the PreToolUse hook auto-claims files as you edit them, so this is " +
+    "mainly for reserving files ahead of time (e.g. before a multi-file refactor) or to check for conflicts early. " +
     "Returns which files were claimed and which are already held by another session — treat conflicts as " +
     "a signal to coordinate with that session, not to force through.",
   {
     issue_id: z.string().describe("Linear issue identifier (e.g. ENG-123) this work belongs to"),
     file_paths: z.array(z.string()).min(1).describe("Absolute or repo-relative file paths to claim"),
+    session_id: SESSION_ID_SCHEMA,
     ttl_seconds: z.number().int().positive().optional().describe("Override the default 4h claim expiry"),
   },
-  async ({ issue_id, file_paths, ttl_seconds }) => {
-    const result = store.claim(issue_id, file_paths, SESSION_ID, ttl_seconds);
-    if (result.claimed.length) notify(issue_id, "claim", result.claimed, SESSION_ID);
-    return { content: [{ type: "text", text: JSON.stringify({ session_id: SESSION_ID, ...result }, null, 2) }] };
+  async ({ issue_id, file_paths, session_id, ttl_seconds }) => {
+    const result = store.claim(issue_id, file_paths, session_id, ttl_seconds, process.cwd());
+    if (result.claimed.length) notify(issue_id, "claim", result.claimed, session_id);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   }
 );
 
@@ -39,12 +47,13 @@ server.tool(
   "Release claims held for a Linear issue id. Call this when the work is done, abandoned, or before handing off.",
   {
     issue_id: z.string().describe("Linear issue identifier whose claims should be released"),
-    session_only: z.boolean().optional().describe("If true, only release claims held by this session (default: release all claims on the issue)"),
+    session_id: SESSION_ID_SCHEMA,
+    all_sessions: z.boolean().optional().describe("If true, release every session's claims on this issue, not just yours (default: false — only release your own)"),
   },
-  async ({ issue_id, session_only }) => {
-    const released = store.release(issue_id, session_only ? SESSION_ID : null);
-    if (released.length) notify(issue_id, "release", released, SESSION_ID);
-    return { content: [{ type: "text", text: JSON.stringify({ session_id: SESSION_ID, released }, null, 2) }] };
+  async ({ issue_id, session_id, all_sessions }) => {
+    const released = store.release(issue_id, all_sessions ? null : session_id);
+    if (released.length) notify(issue_id, "release", released, session_id);
+    return { content: [{ type: "text", text: JSON.stringify({ released }, null, 2) }] };
   }
 );
 
@@ -55,7 +64,7 @@ server.tool(
     file_path: z.string().describe("File path to check"),
   },
   async ({ file_path }) => {
-    const claim = store.check(file_path);
+    const claim = store.check(file_path, process.cwd());
     return { content: [{ type: "text", text: JSON.stringify({ file_path, claim }, null, 2) }] };
   }
 );
@@ -67,7 +76,7 @@ server.tool(
   {},
   async () => {
     const claims = store.status();
-    return { content: [{ type: "text", text: JSON.stringify({ session_id: SESSION_ID, active_claims: claims.length, claims }, null, 2) }] };
+    return { content: [{ type: "text", text: JSON.stringify({ active_claims: claims.length, claims }, null, 2) }] };
   }
 );
 
