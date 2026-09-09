@@ -1,5 +1,8 @@
 # scoped
 
+[![CI](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml/badge.svg)](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
+
 An MCP coordination layer for concurrent Claude Code fleets, with real enforcement — not just an advisory API. `claim`, `release`, and `check` give a fleet of agent sessions a way to ask "is someone already on this file?", and a `PreToolUse` hook automatically blocks an Edit/Write on a file another session already owns, no tool call required.
 
 ## The problem
@@ -89,6 +92,15 @@ Optionally set `SCOPED_ISSUE_ID` (e.g. `ENG-123`) in a session's environment bef
 If a `PreToolUse` or `SessionStart` array already exists in your settings, append these entries to it rather than replacing the array — each event's hooks all run.
 
 </details>
+
+## Development
+
+```bash
+npm install
+npm test
+```
+
+`npm test` runs `node --test`: `ClaimStore` (`src/store.mjs`) is tested directly against a temp SQLite file, and the `PreToolUse` hook is tested as a real subprocess (`$HOME` pointed at a temp dir per test) so deny/allow/auto-claim/touch behavior is exercised through the actual stdin/stdout contract Claude Code uses, not a mock of it. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Troubleshooting
 
