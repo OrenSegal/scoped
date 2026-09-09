@@ -25,6 +25,9 @@ async function graphql(query, variables) {
 }
 
 // Fire-and-forget: posts a comment on the issue noting the claim/release. Does not block or throw.
+// issueId is passed through as whatever identifier the caller used (e.g. "ENG-123"), not resolved
+// to a UUID — Linear's CommentCreateInput.issueId field accepts either form interchangeably, per
+// its GraphQL schema description ("Can be a UUID or issue identifier (e.g., 'LIN-123')").
 export function notify(issueId, action, filePaths, sessionId) {
   if (!enabled()) return;
   const verb = action === "claim" ? "claimed" : "released";
