@@ -8,7 +8,7 @@ cd scoped
 npm install
 ```
 
-Requires Node.js ≥22.5 (for the built-in `node:sqlite`).
+Requires Node.js ≥22.13 (or ≥23.4 on the odd-numbered line) — the version `node:sqlite` stopped requiring `--experimental-sqlite`.
 
 ## Running tests
 
