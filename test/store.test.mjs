@@ -131,7 +131,7 @@ test("status() returns a fleet-wide snapshot of every active claim", () => {
   store.close();
 });
 
-test("concurrent claims on the same file: exactly one wins", () => {
+test("six sequential claims on one file from different sessions (one connection): exactly one wins", () => {
   const store = tmpStore();
   const results = [];
   for (let i = 0; i < 6; i++) {

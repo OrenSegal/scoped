@@ -23,6 +23,10 @@ function defaultDbPath() {
 export class ClaimStore {
   constructor(dbPath = defaultDbPath()) {
     this.db = new DatabaseSync(dbPath);
+    // Hook processes and the MCP server write to this file from separate processes. Without a
+    // busy timeout, a writer that finds the db locked fails immediately with SQLITE_BUSY
+    // ("database is locked") instead of waiting its turn, and the hook fails open on that error.
+    this.db.exec("PRAGMA busy_timeout = 5000");
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS claims (
         file_path   TEXT PRIMARY KEY,
