@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: concurrent hook processes could let more than one session edit the same file. The store opened SQLite with no busy timeout, so racing writers got `database is locked` and the hook failed open; and the hook ran `check()` then `claim()` and ignored the claim result, so two sessions could both see the file as unclaimed and both be allowed. The store now sets `PRAGMA busy_timeout = 5000`, and the hook claims first and denies on conflict.
+- Added `test/concurrency.test.mjs` (multiple OS processes racing `claim()` on one SQLite file) and a multi-process hook race test in `test/hook.test.mjs`. Both fail against the previous code.
+- Renamed the old single-connection "concurrent claims" store test to say what it does: sequential claims on one connection.
+
 ## v0.2.1
 
 - Audited `src/linear.mjs`'s `commentCreate` call: confirmed against Linear's GraphQL schema that `CommentCreateInput.issueId` accepts either a UUID or a human-readable issue identifier (e.g. `ENG-123`), so passing the identifier through untouched is correct — no fix needed, documented in code.
