@@ -24,29 +24,28 @@ async function main() {
 
   const store = new ClaimStore();
   try {
-    const existing = store.check(filePath, cwd);
+    // Claim first and act on the result. A separate check() followed by claim() lets two hook
+    // processes both see "unclaimed" and both allow the edit, even though only one of their
+    // inserts wins. claim() is a single atomic insert, so its result is the real answer.
+    // No SCOPED_ISSUE_ID set means we don't know which Linear issue this belongs to, so group
+    // it under a synthetic per-session bucket rather than block on missing issue context.
+    const issueId = process.env.SCOPED_ISSUE_ID || `adhoc:${session_id.slice(0, 8)}`;
+    const result = store.claim(issueId, [filePath], session_id, undefined, cwd, null); // pid: null, this hook process won't outlive this call
 
-    if (existing && existing.session_id !== session_id) {
-      const ageSeconds = Math.floor(Date.now() / 1000) - existing.claimed_at;
-      const remaining = Math.max(0, existing.ttl_seconds - ageSeconds);
+    if (result.conflicts.length) {
+      const holder = store.check(filePath, cwd) ?? { ...result.conflicts[0].held_by, claimed_at: Math.floor(Date.now() / 1000), ttl_seconds: 0 };
+      const ageSeconds = Math.floor(Date.now() / 1000) - holder.claimed_at;
+      const remaining = Math.max(0, holder.ttl_seconds - ageSeconds);
       deny(
-        `scoped: ${filePath} is claimed by another session (issue ${existing.issue_id}, session ${existing.session_id.slice(0, 8)}), ` +
+        `scoped: ${filePath} is claimed by another session (issue ${holder.issue_id}, session ${holder.session_id.slice(0, 8)}), ` +
           `claimed ${ageSeconds}s ago, expires in ${remaining}s. Coordinate with that session or wait — ` +
           `don't force this edit through, that's the exact collision this hook exists to catch.`
       );
       return;
     }
 
-    if (existing && existing.session_id === session_id) {
-      store.touch(filePath, session_id, cwd); // keep this session's active claim from expiring mid-work
-      return; // allow, silent
-    }
-
-    // Unclaimed: auto-claim it for this session. No SCOPED_ISSUE_ID set means we don't know which
-    // Linear issue this belongs to, so group it under a synthetic per-session bucket rather than
-    // block on missing issue context.
-    const issueId = process.env.SCOPED_ISSUE_ID || `adhoc:${session_id.slice(0, 8)}`;
-    store.claim(issueId, [filePath], session_id, undefined, cwd, null); // pid: null — this hook process won't outlive this call
+    // Newly claimed, or already ours: bump claimed_at so an actively-worked file doesn't expire mid-session.
+    store.touch(filePath, session_id, cwd);
     return; // allow, silent
   } finally {
     store.close();
