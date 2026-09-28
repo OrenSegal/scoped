@@ -106,7 +106,7 @@ npm test
 - **`claim`/`release` calls fail with a missing `session_id`.** The `SessionStart` hook injects it into context at session start; if the session was already running before you ran `npm run setup`, restart it.
 - **Nothing happens and there's no error.** The hook fails open by design, so check its stderr (Claude Code surfaces hook stderr in its debug/transcript output) rather than assuming silence means success.
 
-**Performance note:** the hook adds one Node process start (roughly tens of milliseconds) to every Edit/Write/NotebookEdit call. Measured against 500 concurrent claims in the table, `check()` (which reaps first) averages ~0.2ms, so the cost is process startup, not the lock.
+**Performance note:** the hook adds one Node process start (roughly tens of milliseconds) to every Edit/MultiEdit/Write/NotebookEdit call. Measured against 500 concurrent claims in the table, `check()` (which reaps first) averages ~0.2ms, so the cost is process startup, not the lock.
 
 ## Limitations
 
