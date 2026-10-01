@@ -27,6 +27,10 @@ test("every plugin hook and the MCP launcher point at a file that exists and run
     const rel = c.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/(\S+?)"/)?.[1];
     assert.ok(rel && fs.existsSync(path.join(root, rel)), `missing target in: ${c}`);
   }
-  const launcher = json(".mcp.json").mcpServers.scoped.command.replace("${CLAUDE_PLUGIN_ROOT}", root);
+  const { command, args } = json(".mcp.json").mcpServers.scoped;
+  assert.equal(command, "node");
+  const launcher = args[0].replace("${CLAUDE_PLUGIN_ROOT}", root);
+  assert.ok(fs.existsSync(launcher), `missing MCP launcher: ${args[0]}`);
+  // Also on PATH as a command while the plugin is enabled, so keep it executable.
   assert.ok(fs.statSync(launcher).mode & 0o111, "bin/scoped-mcp must be executable");
 });

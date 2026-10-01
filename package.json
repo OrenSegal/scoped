@@ -23,7 +23,7 @@
     "dev": "node --watch src/index.mjs",
     "setup": "node scripts/install.mjs",
     "uninstall": "node scripts/uninstall.mjs",
-    "test": "node --test"
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
