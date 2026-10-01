@@ -34,3 +34,29 @@ test("every plugin hook and the MCP launcher point at a file that exists and run
   // Also on PATH as a command while the plugin is enabled, so keep it executable.
   assert.ok(fs.statSync(launcher).mode & 0o111, "bin/scoped-mcp must be executable");
 });
+
+test("every eval case has a prompt and graders with a known type (format of `claude plugin eval`)", () => {
+  const types = new Set(["regex", "tool_used", "tool_order", "file_exists", "llm", "baseline"]);
+  const front = (file) => {
+    const m = fs.readFileSync(file, "utf8").match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    assert.ok(m, `${file} has no frontmatter`);
+    return { head: m[1], body: m[2].trim() };
+  };
+  const cases = fs.readdirSync(path.join(root, "evals"), { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "results");
+  assert.ok(cases.length >= 2);
+  for (const c of cases) {
+    const dir = path.join(root, "evals", c.name);
+    const prompt = front(path.join(dir, "prompt.md"));
+    assert.ok(prompt.body.length > 20, `${c.name}: empty prompt`);
+    assert.match(prompt.head, /^max_turns: \d+$/m);
+    const graders = fs.readdirSync(path.join(dir, "graders")).filter((f) => f.endsWith(".md"));
+    assert.ok(graders.length >= 1, `${c.name}: no graders`);
+    for (const g of graders) {
+      const { head, body } = front(path.join(dir, "graders", g));
+      const type = head.match(/^type: (\S+)$/m)?.[1];
+      assert.ok(types.has(type), `${c.name}/${g}: type ${type}`);
+      if (type === "llm") assert.ok(body.length > 20, `${c.name}/${g}: llm grader needs criteria`);
+      if (type === "regex") new RegExp(head.match(/^pattern: '(.*)'$/m)[1]);
+    }
+  }
+});
