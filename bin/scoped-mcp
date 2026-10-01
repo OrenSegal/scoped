@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Plugin entry for the MCP server (.mcp.json runs `node` on this file). All the work is in
+// Plugin entry for the MCP server (plugin.json's mcpServers runs `node` on this file). All the work is in
 // src/launcher.mjs: dependency install into CLAUDE_PLUGIN_DATA on first start, Node version
 // check, then the server. This line is valid as CommonJS and as ESM, so it loads on any Node.
 import("../src/launcher.mjs").then((m) => m.main());

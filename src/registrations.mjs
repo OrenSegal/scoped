@@ -67,15 +67,15 @@ export function hookRegistrations(cwd = process.cwd(), dir = claudeDir()) {
 }
 
 // MCP servers named `scoped` outside the plugin: user and local scope live in ~/.claude.json,
-// project scope in <cwd>/.mcp.json.
+// project scope in <cwd>/.mcp.json. `pluginOnly` marks an entry that uses ${CLAUDE_PLUGIN_ROOT}:
+// outside a plugin that variable is unset, so the server it describes cannot start.
 export function mcpRegistrations(cwd = process.cwd(), env = process.env) {
   const found = [];
+  const add = (scope, file, server) => server && found.push({ scope, file, server, pluginOnly: JSON.stringify(server).includes("${CLAUDE_PLUGIN_ROOT}") });
   const cfgFile = env.CLAUDE_CONFIG_DIR ? path.join(env.CLAUDE_CONFIG_DIR, ".claude.json") : path.join(os.homedir(), ".claude.json");
   const cfg = readJson(cfgFile);
-  if (cfg?.mcpServers?.scoped) found.push({ scope: "user", file: cfgFile, server: cfg.mcpServers.scoped });
-  const local = cfg?.projects?.[cwd]?.mcpServers?.scoped;
-  if (local) found.push({ scope: "local", file: cfgFile, server: local });
-  const proj = readJson(path.join(cwd, ".mcp.json"))?.mcpServers?.scoped;
-  if (proj) found.push({ scope: "project", file: path.join(cwd, ".mcp.json"), server: proj });
+  add("user", cfgFile, cfg?.mcpServers?.scoped);
+  add("local", cfgFile, cfg?.projects?.[cwd]?.mcpServers?.scoped);
+  add("project", path.join(cwd, ".mcp.json"), readJson(path.join(cwd, ".mcp.json"))?.mcpServers?.scoped);
   return found;
 }

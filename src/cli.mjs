@@ -276,7 +276,11 @@ async function doctor() {
     else if (total === 0) report("FAIL", `${event} hook is not registered: install the plugin, or run \`npm run setup\` in a checkout`);
     else report("FAIL", `${event} hook registered ${total} times (${where}). Keep one: \`npm run uninstall\` in the checkout, or remove the plugin`);
   }
-  const mcps = mcpRegistrations(cwd);
+  const allMcps = mcpRegistrations(cwd);
+  for (const m of allMcps.filter((m) => m.pluginOnly)) {
+    report("warn", `${m.scope} MCP server 'scoped' in ${m.file} uses \${CLAUDE_PLUGIN_ROOT}, which is only set inside a plugin, so it cannot start; remove it`);
+  }
+  const mcps = allMcps.filter((m) => !m.pluginOnly);
   const mcpTotal = viaPlugin + mcps.length;
   const mcpWhere = [...(viaPlugin ? ["plugin"] : []), ...mcps.map((m) => `${m.scope}: ${m.file}`)].join("; ");
   if (mcpTotal === 1) report("ok", `MCP server registered once (${mcpWhere})`);

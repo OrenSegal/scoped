@@ -101,6 +101,23 @@ test("setup: a project-level scoped hook counts too", () => {
   assert.deepEqual(hookCommands(settingsOf(h), "PreToolUse"), []);
 });
 
+test("setup: run from the clone itself, nothing in the clone counts as an MCP registration", () => {
+  const h = home();
+  const r = run("install.mjs", h, [], root);
+  assert.equal(r.status, 0, r.out);
+  assert.doesNotMatch(r.out, /already registered/);
+  assert.match(r.out, /claude mcp list/); // went on to register (and found no CLI in this sandbox)
+});
+
+test("setup: a project .mcp.json that only works inside a plugin does not stop registration", () => {
+  const h = home();
+  const proj = fs.mkdtempSync(path.join(h, "proj-"));
+  writeJson(path.join(proj, ".mcp.json"), { mcpServers: { scoped: { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/bin/scoped-mcp"] } } });
+  const r = run("install.mjs", h, [], proj);
+  assert.equal(r.status, 0, r.out);
+  assert.doesNotMatch(r.out, /already registered \(project/);
+});
+
 test("uninstall: removes this checkout's hooks (quoted or legacy unquoted), keeps everything else", () => {
   const h = home();
   const other = { type: "command", command: "echo unrelated" };

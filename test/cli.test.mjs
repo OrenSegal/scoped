@@ -25,8 +25,8 @@ function env(sb, extra = {}) {
   return { ...base, HOME: sb.home, TMPDIR: sb.home, SCOPED_HOME: sb.scopedHome, CLAUDE_CONFIG_DIR: sb.claude, ...extra };
 }
 
-function cli(sb, args, { extra, nodeArgs = [] } = {}) {
-  const r = spawnSync(process.execPath, [...nodeArgs, CLI, ...args], { env: env(sb, extra), cwd: sb.cwd, encoding: "utf8", timeout: 120000 });
+function cli(sb, args, { extra, nodeArgs = [], cwd = sb.cwd } = {}) {
+  const r = spawnSync(process.execPath, [...nodeArgs, CLI, ...args], { env: env(sb, extra), cwd, encoding: "utf8", timeout: 120000 });
   return { code: r.status, out: r.stdout, err: r.stderr };
 }
 
@@ -122,6 +122,23 @@ test("doctor: plugin only, everything reachable -> all good", () => {
   assert.match(r.out, /ok\s+MCP server answers initialize and tools\/list/);
   assert.match(r.out, /ok\s+claims db .*writable, schema v1/);
   assert.match(r.out, /PreToolUse hook takes \d+ms/);
+});
+
+test("doctor: run inside a clone of scoped with the plugin installed -> one MCP registration", () => {
+  const sb = sandbox();
+  writeJson(path.join(sb.claude, "plugins", "installed_plugins.json"), { version: 2, plugins: { "scoped@scoped": [{ scope: "user", installPath: root }] } });
+  const r = cli(sb, ["doctor"], { cwd: root });
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.match(r.out, /ok\s+MCP server registered once \(plugin\)/);
+});
+
+test("doctor: a project .mcp.json that needs ${CLAUDE_PLUGIN_ROOT} is named as broken, not counted", () => {
+  const sb = sandbox();
+  writeJson(path.join(sb.claude, "plugins", "installed_plugins.json"), { version: 2, plugins: { "scoped@scoped": [{ scope: "user", installPath: root }] } });
+  writeJson(path.join(sb.cwd, ".mcp.json"), { mcpServers: { scoped: { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/bin/scoped-mcp"] } } });
+  const r = cli(sb, ["doctor"]);
+  assert.match(r.out, /ok\s+MCP server registered once \(plugin\)/);
+  assert.match(r.out, /warn\s+.*\.mcp\.json.*CLAUDE_PLUGIN_ROOT/);
 });
 
 test("doctor: plugin plus setup hooks is a double registration -> exit 1", () => {

@@ -27,12 +27,20 @@ test("every plugin hook and the MCP launcher point at a file that exists and run
     const rel = c.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/(\S+?)"/)?.[1];
     assert.ok(rel && fs.existsSync(path.join(root, rel)), `missing target in: ${c}`);
   }
-  const { command, args } = json(".mcp.json").mcpServers.scoped;
+  const { command, args } = json(".claude-plugin/plugin.json").mcpServers.scoped;
   assert.equal(command, "node");
   const launcher = args[0].replace("${CLAUDE_PLUGIN_ROOT}", root);
   assert.ok(fs.existsSync(launcher), `missing MCP launcher: ${args[0]}`);
   // Also on PATH as a command while the plugin is enabled, so keep it executable.
   assert.ok(fs.statSync(launcher).mode & 0o111, "bin/scoped-mcp must be executable");
+});
+
+// A root .mcp.json is also a project-scope MCP config for any session opened in a clone, where
+// ${CLAUDE_PLUGIN_ROOT} is unset: it would start a broken second server. The plugin declares
+// its server in plugin.json instead, which only the plugin loader reads.
+test("the MCP server is declared in plugin.json, not in a project-scope .mcp.json", () => {
+  assert.equal(fs.existsSync(path.join(root, ".mcp.json")), false);
+  assert.deepEqual(Object.keys(json(".claude-plugin/plugin.json").mcpServers ?? {}), ["scoped"]);
 });
 
 test("every eval case has a prompt and graders with a known type (format of `claude plugin eval`)", () => {

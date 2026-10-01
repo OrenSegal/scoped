@@ -39,7 +39,11 @@ function refuseIfPlugin() {
 }
 
 function registerMcpServer() {
-  const existing = mcpRegistrations(CWD);
+  const all = mcpRegistrations(CWD);
+  for (const m of all.filter((m) => m.pluginOnly)) {
+    log(`WARNING: ${m.file} defines a 'scoped' server with \${CLAUDE_PLUGIN_ROOT}, which only resolves inside a plugin; it cannot start, so remove it.`);
+  }
+  const existing = all.filter((m) => !m.pluginOnly);
   if (existing.length) {
     log(`MCP server 'scoped' is already registered (${existing.map((e) => `${e.scope} in ${e.file}`).join(", ")}) — skipping.`);
     return;

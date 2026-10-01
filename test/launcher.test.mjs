@@ -1,5 +1,5 @@
 // The plugin's MCP launcher, run the way Claude Code runs it: the command and args from
-// .mcp.json with ${CLAUDE_PLUGIN_ROOT} substituted, from a plugin checkout that has no
+// plugin.json's mcpServers with ${CLAUDE_PLUGIN_ROOT} substituted, from a plugin checkout that has no
 // node_modules. npm is replaced by a fake on PATH so these run offline; the one test that uses
 // the real registry is gated behind SCOPED_NETWORK_TESTS=1.
 
@@ -56,7 +56,7 @@ function fakePath({ npm = "copy", sleep = 0 } = {}) {
 }
 
 function launcherCommand(pluginRoot) {
-  const { command, args = [] } = JSON.parse(fs.readFileSync(path.join(pluginRoot, ".mcp.json"), "utf8")).mcpServers.scoped;
+  const { command, args = [] } = JSON.parse(fs.readFileSync(path.join(pluginRoot, ".claude-plugin", "plugin.json"), "utf8")).mcpServers.scoped;
   const sub = (s) => s.replaceAll("${CLAUDE_PLUGIN_ROOT}", pluginRoot);
   return [sub(command) === "node" ? process.execPath : sub(command), args.map(sub)];
 }
@@ -88,8 +88,8 @@ async function speak(s) {
 
 const depsDirs = (data) => (fs.existsSync(path.join(data, "deps")) ? fs.readdirSync(path.join(data, "deps")) : []);
 
-test(".mcp.json starts the server with `node`, so it runs where shebangs do not", () => {
-  const { command, args } = JSON.parse(fs.readFileSync(path.join(root, ".mcp.json"), "utf8")).mcpServers.scoped;
+test("plugin.json starts the server with `node`, so it runs where shebangs do not", () => {
+  const { command, args } = JSON.parse(fs.readFileSync(path.join(root, ".claude-plugin", "plugin.json"), "utf8")).mcpServers.scoped;
   assert.equal(command, "node");
   assert.deepEqual(args, ["${CLAUDE_PLUGIN_ROOT}/bin/scoped-mcp"]);
 });
