@@ -20,6 +20,7 @@ test("server: initialize, tools/list, a claim round trip, and nothing but JSON-R
   const s = server({ SCOPED_DB: path.join(dir, "c.db"), LINEAR_API_KEY: "lin_test_never_used" });
   const init = await s.initialize();
   assert.equal(init.result.serverInfo.name, "scoped");
+  assert.equal(init.result.serverInfo.version, JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version);
   const tools = (await s.request("tools/list")).result.tools.map((t) => t.name).sort();
   assert.deepEqual(tools, ["check", "claim", "release", "status"]);
   // adhoc: ids are not Linear issues, so no network call is attempted for them.

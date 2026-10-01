@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { MIN_NODE } from "./config.mjs";
+import { minNode } from "./config.mjs";
 
 export async function sqliteProblem() {
   try {
@@ -17,7 +17,7 @@ export async function sqliteProblem() {
   } catch (err) {
     return (
       `node:sqlite is unavailable in Node ${process.version} (${err.code || err.message}). ` +
-      `scoped needs Node >= ${MIN_NODE} (or >= 23.4 on the odd line), where node:sqlite needs no flag. ` +
+      `scoped needs Node >= ${minNode()} (or >= 23.4 on the odd line), where node:sqlite needs no flag. ` +
       `Upgrade the \`node\` on Claude Code's PATH.`
     );
   }

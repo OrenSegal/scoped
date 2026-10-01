@@ -10,7 +10,7 @@
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { ISSUE_ID_RE, MAX_TTL_SECONDS, SESSION_ID_RE, dbPath } from "./config.mjs";
+import { DEFAULT_TTL_SECONDS, ISSUE_ID_RE, MAX_TTL_SECONDS, SESSION_ID_RE, dbPath, version } from "./config.mjs";
 import { sqliteProblem } from "./runtime.mjs";
 
 const problem = await sqliteProblem();
@@ -62,10 +62,7 @@ const SESSION_ID_SCHEMA = z
 const ISSUE_ID_SCHEMA = z.string().regex(ISSUE_ID_RE, "not an issue identifier");
 const FILE_PATH_SCHEMA = z.string().min(1).max(4096);
 
-const server = new McpServer({
-  name: "scoped",
-  version: "0.4.0",
-});
+const server = new McpServer({ name: "scoped", version: version() });
 
 server.tool(
   "claim",
@@ -78,7 +75,7 @@ server.tool(
     issue_id: ISSUE_ID_SCHEMA.describe("Linear issue identifier (e.g. ENG-123) this work belongs to"),
     file_paths: z.array(FILE_PATH_SCHEMA).min(1).max(200).describe("Absolute or repo-relative file paths to claim"),
     session_id: SESSION_ID_SCHEMA,
-    ttl_seconds: z.number().int().positive().max(MAX_TTL_SECONDS).optional().describe("Override the default 4h claim expiry (max 7 days)"),
+    ttl_seconds: z.number().int().positive().max(MAX_TTL_SECONDS).optional().describe(`Override the default ${DEFAULT_TTL_SECONDS / 3600}h claim expiry (max ${MAX_TTL_SECONDS / 86400} days)`),
   },
   safe(async ({ issue_id, file_paths, session_id, ttl_seconds }) => {
     const result = openStore().claim(issue_id, file_paths, session_id, ttl_seconds, process.cwd());

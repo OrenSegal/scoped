@@ -173,13 +173,6 @@ export class ClaimStore {
     });
   }
 
-  // Bumps claimed_at to now for a file this session already owns, extending its TTL.
-  touch(filePath, sessionId, cwd) {
-    const fp = canonicalPath(filePath, cwd);
-    const now = Math.floor(Date.now() / 1000);
-    this.db.prepare(`UPDATE claims SET claimed_at = ? WHERE file_path = ? AND session_id = ?`).run(now, fp, sessionId);
-  }
-
   // Releases every claim held under issueId. If sessionId is given, only releases that session's claims.
   release(issueId, sessionId = null) {
     return this._tx(() => {
@@ -210,6 +203,19 @@ export class ClaimStore {
         .map((r) => r.file_path);
       return { session_id: id, released };
     });
+  }
+
+  // Proves the db accepts a write (doctor): inserts a row and rolls it back. Returns the row count.
+  probeWrite() {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare("INSERT INTO claims (file_path, issue_id, session_id, pid, hostname, claimed_at, ttl_seconds) VALUES (?, ?, ?, NULL, ?, 0, 0)")
+        .run("\u0000doctor", "doctor", "doctor", HOSTNAME);
+    } finally {
+      this.db.exec("ROLLBACK");
+    }
+    return this.db.prepare("SELECT count(*) AS n FROM claims").get().n;
   }
 
   // Reaps dead claims now and returns their paths.

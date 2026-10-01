@@ -2,11 +2,26 @@
 // No dependencies beyond node: builtins, and no node:sqlite, so every entry point can load
 // this before it has checked that node:sqlite exists.
 
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export const VERSION = "0.4.0";
-export const MIN_NODE = "22.13.0";
+// package.json is the one place the version and the minimum Node are written. Read on first
+// use, not at import, so a hook that never needs them never touches the file.
+let pkg;
+function manifest() {
+  if (!pkg) {
+    try {
+      pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+    } catch {
+      pkg = {};
+    }
+  }
+  return pkg;
+}
+
+export const version = () => manifest().version || "unknown";
+export const minNode = () => (manifest().engines?.node || "unknown").replace(/^>=\s*/, "");
 
 // SCOPED_HOME moves everything scoped writes; SCOPED_DB and SCOPED_LOG move one file each.
 export function dataDir() {

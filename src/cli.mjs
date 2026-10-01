@@ -9,12 +9,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MIN_NODE, SESSION_ID_RE, VERSION, blockLogPath, dbPath } from "./config.mjs";
+import { DEFAULT_TTL_SECONDS, SESSION_ID_RE, blockLogPath, dbPath, minNode, version } from "./config.mjs";
 import { readBlocks } from "./blocklog.mjs";
 import { hookRegistrations, mcpRegistrations, pluginRegistrations, HOOK_FILES } from "./registrations.mjs";
 import { sqliteProblem } from "./runtime.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const VERSION = version();
 
 const HELP = `scoped ${VERSION} — file claims between concurrent Claude Code sessions
 
@@ -29,8 +30,7 @@ usage: scoped <command>
   doctor                   check Node, the db, hook and MCP registration, hook latency
   version
 
-environment: SCOPED_HOME (default ~/.scoped), SCOPED_DB, SCOPED_LOG (path or "off"),
-SCOPED_ISSUE_ID, SCOPED_FAIL_CLOSED=1, SCOPED_HOOK_MS (doctor's latency budget), SCOPED_DEBUG`;
+environment variables: https://github.com/OrenSegal/scoped#configuration`;
 
 class UsageError extends Error {}
 
@@ -140,8 +140,8 @@ const commands = {
         "  - Holder is an adhoc:* bucket: that session ran without SCOPED_ISSUE_ID; set it so\n" +
         "    claims and blocks say which issue they belong to.\n" +
         "  - Holder was a session that had already finished: its claim lives until the TTL\n" +
-        "    (4h) runs out. `scoped release <session>` frees it now; ask agents to call the\n" +
-        "    release tool when they finish.\n" +
+        `    (${DEFAULT_TTL_SECONDS / 3600}h by default) runs out. \`scoped release <session>\` frees it now;\n` +
+        "    ask agents to call the release tool when they finish.\n" +
         "  - Blocks you consider false positives (generated files, lockfiles): those are real\n" +
         "    concurrent writes; serialize them rather than exempting them."
     );
@@ -238,7 +238,7 @@ async function doctor() {
   // Node
   const problem = await sqliteProblem();
   if (problem) report("FAIL", problem);
-  else if (cmpVersion(process.version, MIN_NODE) < 0) report("warn", `Node ${process.version} has node:sqlite, but scoped is tested on >= ${MIN_NODE}`);
+  else if (cmpVersion(process.version, minNode()) < 0) report("warn", `Node ${process.version} has node:sqlite, but scoped is tested on >= ${minNode()}`);
   else report("ok", `Node ${process.version}, node:sqlite available`);
 
   // Claims db
@@ -247,13 +247,7 @@ async function doctor() {
       const { SCHEMA_VERSION } = await import("./store.mjs");
       await withStore((s) => {
         const v = s.schemaVersion();
-        s.db.exec("BEGIN IMMEDIATE");
-        try {
-          s.db.prepare("INSERT INTO claims (file_path, issue_id, session_id, pid, hostname, claimed_at, ttl_seconds) VALUES (?, ?, ?, NULL, ?, 0, 0)").run("\u0000doctor", "doctor", "doctor", os.hostname());
-        } finally {
-          s.db.exec("ROLLBACK");
-        }
-        const n = s.db.prepare("SELECT count(*) AS n FROM claims").get().n;
+        const n = s.probeWrite();
         report(v === SCHEMA_VERSION ? "ok" : "FAIL", `claims db ${s.path}: writable, schema v${v}, ${n} row(s)`);
       });
     } catch (err) {

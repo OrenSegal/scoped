@@ -7,16 +7,48 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const json = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8"));
 
-test("plugin manifest, package and server report the same version", () => {
+const codeFiles = () =>
+  ["src", "hooks", "scripts", "bin"].flatMap((d) =>
+    fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".mjs") || d === "bin" && !f.endsWith(".json")).map((f) => path.join(d, f))
+  );
+
+// package.json is the one place the version is written by hand. JSON manifests can't import it,
+// so they must equal it; code reads it (src/config.mjs) and must not spell a version itself.
+test("version: package.json is the source; manifests match it and no code hardcodes one", async () => {
   const v = json("package.json").version;
   assert.equal(json(".claude-plugin/plugin.json").version, v);
   assert.equal(json(".claude-plugin/marketplace.json").plugins[0].version, v);
-  assert.match(fs.readFileSync(path.join(root, "src/index.mjs"), "utf8"), new RegExp(`version: "${v}"`));
-  assert.match(fs.readFileSync(path.join(root, "src/config.mjs"), "utf8"), new RegExp(`VERSION = "${v}"`));
   const lock = json("package-lock.json");
   assert.equal(lock.version, v);
   assert.equal(lock.packages[""].version, v);
   assert.match(fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8"), new RegExp(`^## v?${v.replace(/\./g, "\\.")}`, "m"));
+  for (const f of codeFiles()) {
+    assert.doesNotMatch(fs.readFileSync(path.join(root, f), "utf8"), /["'`]v?\d+\.\d+\.\d+["'`]/, `${f} hardcodes a version`);
+  }
+  const { version, minNode } = await import("../src/config.mjs");
+  assert.equal(version(), v);
+  assert.equal(`>=${minNode()}`, json("package.json").engines.node);
+});
+
+test("one description for package, plugin and marketplace entry", () => {
+  const d = json("package.json").description;
+  assert.equal(json(".claude-plugin/plugin.json").description, d);
+  assert.equal(json(".claude-plugin/marketplace.json").plugins[0].description, d);
+});
+
+// README's Configuration table is the one list of environment variables. Every variable the code
+// reads is in it, and nothing in it is unread. SCOPED_DEPS_DIR is the launcher telling the server
+// where it installed the dependencies, not a setting.
+test("README's configuration table lists exactly the environment variables the code reads", () => {
+  const used = new Set();
+  for (const f of codeFiles()) {
+    for (const m of fs.readFileSync(path.join(root, f), "utf8").matchAll(/\b(SCOPED_[A-Z_]+|LINEAR_API_KEY)\b/g)) used.add(m[1]);
+  }
+  used.delete("SCOPED_DEPS_DIR");
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const section = readme.slice(readme.indexOf("## Configuration"), readme.indexOf("\n## ", readme.indexOf("## Configuration") + 1));
+  const documented = new Set([...section.matchAll(/^\| `([A-Z_]+)` \|/gm)].map((m) => m[1]));
+  assert.deepEqual([...documented].sort(), [...used].sort());
 });
 
 test("every plugin hook and the MCP launcher point at a file that exists and runs", () => {

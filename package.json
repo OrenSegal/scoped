@@ -1,7 +1,7 @@
 {
   "name": "scoped",
   "version": "0.4.0",
-  "description": "MCP coordination layer for concurrent Claude Code fleets — file-level claim/release/check locking backed by local SQLite, with optional async Linear visibility.",
+  "description": "File claims between concurrent Claude Code sessions, enforced by a PreToolUse hook, with an MCP server for claim, release, check and status.",
   "type": "module",
   "repository": {
     "type": "git",
