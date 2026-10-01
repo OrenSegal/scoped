@@ -20,7 +20,8 @@
 - `evals/`: a `claude plugin eval` suite (reads `scoped status` instead of guessing; coordinates after a deny instead of forcing the edit). Not run in CI, since runs are paid; its format is checked by `test/plugin.test.mjs`.
 - CI: Ubuntu and macOS × Node 22.13.0, 22.x and 24.x; a real registry install through the launcher; `claude plugin validate --strict` on the manifest, the marketplace and the plugin directory (commands included). Dependabot for npm and GitHub Actions.
 - Docs: README covers the CLI, slash commands, every environment variable, the fail-open/fail-closed policy, where the MCP dependencies live, and the limits (worktrees, case-insensitive file systems, Windows untested). SECURITY.md says what Linear receives and what the block log holds. CODE_OF_CONDUCT.md.
-- Tests: 28 → 96; one of them, the registry install, runs only with `SCOPED_NETWORK_TESTS=1`.
+- `package.json` is the one source for the version, the minimum Node version and the description; the manifests, the lockfile, the MCP server's `serverInfo` and `scoped --version` follow it, and `test/plugin.test.mjs` fails on any drift. README's Configuration table is checked against the environment variables the code reads.
+- The registry install test runs only with `SCOPED_NETWORK_TESTS=1`.
 
 ## v0.3.0
 

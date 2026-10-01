@@ -30,6 +30,13 @@ test("version: package.json is the source; manifests match it and no code hardco
   assert.equal(`>=${minNode()}`, json("package.json").engines.node);
 });
 
+test("README and the CI matrix name engines.node's minimum, not their own", async () => {
+  const { minNode } = await import("../src/config.mjs");
+  assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), new RegExp(`Requires Node\\.js ${minNode().replace(/\./g, "\\.")} or later`));
+  const matrix = fs.readFileSync(path.join(root, ".github/workflows/ci.yml"), "utf8").match(/node-version: \[([^\]]*)\]/)[1];
+  assert.ok(matrix.split(/,\s*/).includes(minNode()), `CI matrix [${matrix}] does not test ${minNode()}`);
+});
+
 test("one description for package, plugin and marketplace entry", () => {
   const d = json("package.json").description;
   assert.equal(json(".claude-plugin/plugin.json").description, d);
