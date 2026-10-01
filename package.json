@@ -12,7 +12,8 @@
     "url": "https://github.com/OrenSegal/scoped/issues"
   },
   "bin": {
-    "scoped": "./src/index.mjs"
+    "scoped": "./bin/scoped",
+    "scoped-mcp": "./bin/scoped-mcp"
   },
   "main": "src/index.mjs",
   "engines": {
