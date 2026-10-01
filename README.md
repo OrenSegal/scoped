@@ -123,7 +123,7 @@ If a `PreToolUse` or `SessionStart` array already exists in your settings, appen
 | `scoped check <file>` | | Exit 1 and name the holder if `<file>` is claimed, exit 0 if it is free |
 | `scoped release <session or prefix>` | `/scoped:release` | Free every claim a session holds. The prefix needs at least 4 characters and must match one session; the deny message prints the 8-character one |
 | `scoped gc` | | Reap expired and dead-pid claims now (every read does this anyway) |
-| `scoped report [--days=N]` | `/scoped:report` | Blocked edits from the block log (default 7 days) by file, session pair and issue, with what to change if one file keeps colliding |
+| `scoped report [--days=N]` | `/scoped:report` | Blocked edits from the block log (default 30 days) by file, session pair and issue, with what to change if one file keeps colliding |
 | `scoped doctor` | `/scoped:doctor` | Node and `node:sqlite`; claims db writable and its schema version; each hook and the MCP server registered exactly once across the plugin and user/project/local settings; an MCP `initialize` + `tools/list` round trip; PreToolUse latency against a budget; the fail policy. Exit 1 on any FAIL |
 
 `/scoped:release` with another session's id shows that session's claims and asks before
