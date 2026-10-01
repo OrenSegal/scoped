@@ -12,6 +12,11 @@ test("plugin manifest, package and server report the same version", () => {
   assert.equal(json(".claude-plugin/plugin.json").version, v);
   assert.equal(json(".claude-plugin/marketplace.json").plugins[0].version, v);
   assert.match(fs.readFileSync(path.join(root, "src/index.mjs"), "utf8"), new RegExp(`version: "${v}"`));
+  assert.match(fs.readFileSync(path.join(root, "src/config.mjs"), "utf8"), new RegExp(`VERSION = "${v}"`));
+  const lock = json("package-lock.json");
+  assert.equal(lock.version, v);
+  assert.equal(lock.packages[""].version, v);
+  assert.match(fs.readFileSync(path.join(root, "CHANGELOG.md"), "utf8"), new RegExp(`^## v?${v.replace(/\./g, "\\.")}`, "m"));
 });
 
 test("every plugin hook and the MCP launcher point at a file that exists and runs", () => {

@@ -1,6 +1,6 @@
 {
   "name": "scoped",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "MCP coordination layer for concurrent Claude Code fleets — file-level claim/release/check locking backed by local SQLite, with optional async Linear visibility.",
   "type": "module",
   "repository": {

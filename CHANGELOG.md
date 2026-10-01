@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.0
+
+- MCP server: probes node:sqlite before loading anything and exits with one sentence on an old Node; opens the claims db lazily so an unusable db is an `isError` tool result instead of a dead server; validates `session_id`/`issue_id`, caps `file_paths` at 200 and `ttl_seconds` at 7 days; nothing but JSON-RPC on stdout (tested).
+- Linear: comments name files relative to the session's working directory (`…/<basename>` outside it) and only the first 8 characters of the session id; inline code is escaped; 10 s request timeout; ids that are not Linear issues (`adhoc:` buckets) are never posted.
+
 ## v0.3.0
 
 - Now a Claude Code plugin: `.claude-plugin/plugin.json`, `hooks/hooks.json` (SessionStart and PreToolUse), and `.mcp.json` starting the server through `bin/scoped-mcp`, which installs dependencies on first start.
