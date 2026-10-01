@@ -152,6 +152,15 @@ test("a deny appends one line to the block log: no file contents, SCOPED_LOG=off
   assert.ok(!fs.existsSync(path.join(home2, ".scoped", "blocks.tsv")));
 });
 
+test("a twice-registered hook denies twice but logs the block once", async () => {
+  const home = tmp();
+  await run(PRETOOL, edit("aaaaaaaa-1111", "/repo/a.js"), { home });
+  const both = await Promise.all([run(PRETOOL, edit("bbbbbbbb-2222", "/repo/a.js"), { home }), run(PRETOOL, edit("bbbbbbbb-2222", "/repo/a.js"), { home })]);
+  for (const r of both) assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, "deny");
+  const log = fs.readFileSync(path.join(home, ".scoped", "blocks.tsv"), "utf8").trim().split("\n");
+  assert.equal(log.length, 1, log.join("\n"));
+});
+
 test("hooks.json sets a timeout above the store's 5s busy wait", () => {
   const hooks = JSON.parse(fs.readFileSync(path.join(root, "hooks", "hooks.json"), "utf8")).hooks;
   for (const group of Object.values(hooks).flat()) {

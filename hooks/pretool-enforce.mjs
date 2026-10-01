@@ -51,7 +51,10 @@ async function main() {
     const holder = store.check(file_path) ?? { ...held_by, claimed_at: Math.floor(Date.now() / 1000), ttl_seconds: 0 };
     const ageSeconds = Math.floor(Date.now() / 1000) - holder.claimed_at;
     const remaining = Math.max(0, holder.ttl_seconds - ageSeconds);
-    appendBlock({ tool: tool_name, file: file_path, requester: session_id, holder: holder.session_id, issue: holder.issue_id });
+    // Registered twice (plugin and settings), this hook runs twice for one attempt: log it once.
+    if (firstWithin(`block:${session_id}:${tool_name}:${file_path}`, 5000)) {
+      appendBlock({ tool: tool_name, file: file_path, requester: session_id, holder: holder.session_id, issue: holder.issue_id });
+    }
     deny(
       `scoped: ${file_path} is claimed by another session (issue ${holder.issue_id}, session ${holder.session_id.slice(0, 8)}), ` +
         `claimed ${ageSeconds}s ago, expires in ${remaining}s. Coordinate with that session or wait — ` +
