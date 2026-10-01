@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "scoped": { "command": "${CLAUDE_PLUGIN_ROOT}/bin/scoped-mcp" }
+  }
+}
