@@ -1,0 +1,8 @@
+{
+  "name": "scoped",
+  "owner": { "name": "Oren Segal" },
+  "description": "Marketplace for the scoped plugin.",
+  "plugins": [
+    { "name": "scoped", "source": "./", "description": "File claims between concurrent Claude Code sessions.", "version": "0.3.0", "license": "MIT" }
+  ]
+}

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Plugin entry for the MCP server. A plugin checkout has no node_modules, so
+# install the two runtime deps on first use. npm output goes to stderr because
+# stdout is the MCP transport.
+root="$(cd "$(dirname "$0")/.." && pwd)"
+if [ ! -d "$root/node_modules/@modelcontextprotocol" ]; then
+  (cd "$root" && npm ci --omit=dev --no-audit --no-fund >&2) || exit 1
+fi
+exec node "$root/src/index.mjs"

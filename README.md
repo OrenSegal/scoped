@@ -34,6 +34,20 @@ Running more than one Claude Code session against the same codebase is now norma
 
 ## Setup
 
+### As a plugin
+
+```bash
+claude plugin marketplace add OrenSegal/scoped
+claude plugin install scoped@scoped
+```
+
+The plugin registers both hooks and the MCP server. The server installs its two
+runtime dependencies on first start (`bin/scoped-mcp`, needs `npm` and network
+once). Don't also run `npm run setup`: the hooks would register twice. Claims
+are idempotent per session, so doubling is harmless, but it is noise.
+
+### From a clone
+
 Requires Node.js ≥22.13 (or ≥23.4 on the odd-numbered line) and the `claude` CLI on your `PATH`. `node:sqlite` exists from Node 22.5, but stayed behind `--experimental-sqlite` until 22.13/23.4. scoped never passes that flag when it runs the server or hooks, so 22.5-22.12 will hit `ERR_UNKNOWN_BUILTIN_MODULE`.
 
 ```bash

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0
+
+- Now a Claude Code plugin: `.claude-plugin/plugin.json`, `hooks/hooks.json` (SessionStart and PreToolUse), and `.mcp.json` starting the server through `bin/scoped-mcp`, which installs dependencies on first start.
+- `test/plugin.test.mjs` keeps the manifest, package and server versions equal and checks each hook target exists.
+- SECURITY.md; CI validates the plugin manifest.
+
 ## v0.2.2
 
 - Fixed: concurrent hook processes could let more than one session edit the same file. The store opened SQLite with no busy timeout, so racing writers got `database is locked` and the hook failed open; and the hook ran `check()` then `claim()` and ignored the claim result, so two sessions could both see the file as unclaimed and both be allowed. The store now sets `PRAGMA busy_timeout = 5000`, and the hook claims first and denies on conflict.

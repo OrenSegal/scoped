@@ -19,7 +19,7 @@ const SESSION_ID_SCHEMA = z
 
 const server = new McpServer({
   name: "scoped",
-  version: "0.2.2",
+  version: "0.3.0",
 });
 
 server.tool(
