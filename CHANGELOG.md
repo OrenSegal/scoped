@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.1
 
 - `/scoped:status` runs `${CLAUDE_PLUGIN_ROOT}/bin/scoped status` when `scoped` is not on PATH (as in `claude plugin eval` runs), instead of leaving the model to search for it.
 - `status-shows-claims` eval: the case may load skills, the CLI grader matches `scoped status` or `scoped check` by name or path, and the judge fails answers that come from `ls`, `git`, log files or a failed scoped call.
