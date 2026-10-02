@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `/scoped:status` runs `${CLAUDE_PLUGIN_ROOT}/bin/scoped status` when `scoped` is not on PATH (as in `claude plugin eval` runs), instead of leaving the model to search for it.
+- `status-shows-claims` eval: the case may load skills, the CLI grader matches `scoped status` or `scoped check` by name or path, and the judge fails answers that come from `ls`, `git`, log files or a failed scoped call.
+
 ## v0.4.0
 
 - Claims key on the canonical path (`src/paths.mjs`: resolved, symlinks and `..` followed through the deepest existing ancestor, case folded on Windows). Before, `/repo/x/../a.js`, a symlinked directory, `/tmp` vs `/private/tmp` on macOS or a different-case spelling were separate keys for one file, and two sessions could both edit it.

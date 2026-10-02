@@ -4,7 +4,7 @@ tags: [cli, status]
 runs: 3
 max_turns: 8
 timeout_seconds: 180
-allowed_tools: [Bash, Read]
+allowed_tools: [Bash, Read, Skill]
 expected_outcome: Runs `scoped status` (or `scoped check`) and reports what it printed, including "no active claims".
 ---
 
