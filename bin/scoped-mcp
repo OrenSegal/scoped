@@ -1,9 +1,5 @@
-#!/bin/sh
-# Plugin entry for the MCP server. A plugin checkout has no node_modules, so
-# install the two runtime deps on first use. npm output goes to stderr because
-# stdout is the MCP transport.
-root="$(cd "$(dirname "$0")/.." && pwd)"
-if [ ! -d "$root/node_modules/@modelcontextprotocol" ]; then
-  (cd "$root" && npm ci --omit=dev --no-audit --no-fund >&2) || exit 1
-fi
-exec node "$root/src/index.mjs"
+#!/usr/bin/env node
+// Plugin entry for the MCP server (plugin.json's mcpServers runs `node` on this file). All the work is in
+// src/launcher.mjs: dependency install into CLAUDE_PLUGIN_DATA on first start, Node version
+// check, then the server. This line is valid as CommonJS and as ESM, so it loads on any Node.
+import("../src/launcher.mjs").then((m) => m.main());

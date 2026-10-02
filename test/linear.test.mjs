@@ -52,7 +52,7 @@ test("notify() posts commentCreate with the raw issue identifier, not a resolved
         return { ok: true, json: async () => ({ data: { commentCreate: { success: true } } }) };
       },
       async () => {
-        notify("ENG-123", "claim", ["/repo/a.js", "/repo/b.js"], "session-a");
+        notify("ENG-123", "claim", ["/repo/a.js", "/repo/src/b.js"], "session-a", "/repo");
         await flush();
       }
     );
@@ -69,8 +69,9 @@ test("notify() posts commentCreate with the raw issue identifier, not a resolved
     // CommentCreateInput.issueId accepts either a UUID or an issue identifier like "ENG-123".
     assert.equal(payload.variables.issueId, "ENG-123");
     assert.match(payload.variables.body, /claimed 2 file\(s\)/);
-    assert.match(payload.variables.body, /`\/repo\/a\.js`/);
-    assert.match(payload.variables.body, /`\/repo\/b\.js`/);
+    // Paths are shown relative to the session's working directory, not as absolute paths.
+    assert.match(payload.variables.body, /`a\.js`/);
+    assert.match(payload.variables.body, /`src\/b\.js`/);
   });
 });
 
@@ -113,4 +114,62 @@ test("notify() swallows a GraphQL errors payload without throwing", async () => 
       }
     );
   });
+});
+
+function capture(fn) {
+  const calls = [];
+  return withEnv("LINEAR_API_KEY", "lin_api_test_key", () =>
+    withFetch(
+      async (url, init) => {
+        calls.push({ url, init });
+        return { ok: true, json: async () => ({ data: { commentCreate: { success: true } } }) };
+      },
+      async () => {
+        fn();
+        await flush();
+      }
+    )
+  ).then(() => calls);
+}
+
+test("notify() sends only the comment: no absolute paths, no full session id, no extra fields", async () => {
+  const session = "0f3c9a7e-1111-2222-3333-444455556666";
+  const calls = await capture(() =>
+    notify("ENG-9", "claim", ["/repo/src/a.js", "/Users/alice/secrets/notes.md"], session, "/repo")
+  );
+  assert.equal(calls.length, 1);
+  const { init } = calls[0];
+  assert.deepEqual(Object.keys(init.headers).sort(), ["Authorization", "Content-Type"]);
+  const payload = JSON.parse(init.body);
+  assert.deepEqual(Object.keys(payload).sort(), ["query", "variables"]);
+  assert.deepEqual(Object.keys(payload.variables).sort(), ["body", "issueId"]);
+  const body = payload.variables.body;
+  assert.doesNotMatch(body, /\/Users\/alice/);
+  assert.doesNotMatch(body, /\/repo\//);
+  assert.match(body, /`src\/a\.js`/);
+  assert.match(body, /`…\/notes\.md`/);
+  assert.doesNotMatch(body, new RegExp(session));
+  assert.match(body, /`0f3c9a7e`/);
+});
+
+test("notify() cannot be made to break out of its code spans", async () => {
+  const calls = await capture(() => notify("ENG-9", "claim", ["/repo/a`b\n# heading.js"], "session-a", "/repo"));
+  const body = JSON.parse(calls[0].init.body).variables.body;
+  assert.equal(body.split("\n").length, 2);
+  assert.doesNotMatch(body, /a`b/);
+});
+
+test("notify() has a request timeout", async () => {
+  const calls = await capture(() => notify("ENG-9", "claim", ["/repo/a.js"], "session-a", "/repo"));
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
+});
+
+test("notify() does not contact Linear for ids that are not Linear issues", async () => {
+  const calls = await capture(() => {
+    notify("adhoc:0f3c9a7e", "claim", ["/repo/a.js"], "session-a", "/repo");
+    notify("whatever", "claim", ["/repo/a.js"], "session-a", "/repo");
+  });
+  assert.equal(calls.length, 0);
+  const uuid = await capture(() => notify("2a1b3c4d-1111-2222-3333-444455556666", "claim", ["/repo/a.js"], "session-a", "/repo"));
+  assert.equal(uuid.length, 1);
 });

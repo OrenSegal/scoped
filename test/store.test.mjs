@@ -97,27 +97,27 @@ test("claims made with pid: null (short-lived callers, e.g. the hook) are never 
   store.close();
 });
 
-test("touch() extends claimed_at for the owning session", async () => {
+test("re-claiming a file you own extends claimed_at", async () => {
   const store = tmpStore();
   store.claim("ENG-1", ["/repo/a.js"], "session-a", 100);
   const before = store.check("/repo/a.js").claimed_at;
   await new Promise((r) => setTimeout(r, 1100));
-  store.touch("/repo/a.js", "session-a");
+  store.claim("ENG-1", ["/repo/a.js"], "session-a", 100);
   const after = store.check("/repo/a.js").claimed_at;
   assert.ok(after > before);
   store.close();
 });
 
-test("touch() does nothing for a session that doesn't own the claim", () => {
+test("a claim attempt by a session that doesn't own the file leaves claimed_at alone", async () => {
   const store = tmpStore();
   store.claim("ENG-1", ["/repo/a.js"], "session-a", 100);
   const before = store.check("/repo/a.js").claimed_at;
-  store.touch("/repo/a.js", "session-b");
+  await new Promise((r) => setTimeout(r, 1100));
+  assert.equal(store.claim("ENG-2", ["/repo/a.js"], "session-b", 100).conflicts.length, 1);
   const after = store.check("/repo/a.js").claimed_at;
   assert.equal(after, before);
   store.close();
 });
-
 test("status() returns a fleet-wide snapshot of every active claim", () => {
   const store = tmpStore();
   store.claim("ENG-1", ["/repo/a.js"], "session-a");

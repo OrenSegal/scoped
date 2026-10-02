@@ -1,12 +1,12 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"" } ] }
+      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.mjs\"", "timeout": 15 } ] }
     ],
     "PreToolUse": [
       {
         "matcher": "Edit|MultiEdit|Write|NotebookEdit",
-        "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pretool-enforce.mjs\"" } ]
+        "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/pretool-enforce.mjs\"", "timeout": 15 } ]
       }
     ]
   }

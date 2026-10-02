@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+// The `scoped` CLI (status, check, release, gc, report, doctor). See src/cli.mjs.
+// Valid as CommonJS and as ESM, so it loads on any Node and can report an old one.
+import("../src/cli.mjs").then((m) => m.main(process.argv.slice(2)));

@@ -1,0 +1,4 @@
+{
+  "//": "The files in bin/ have no extension. Older Nodes refuse extensionless files inside a \"type\": \"module\" package, so bin/ is CommonJS; each file only does a dynamic import(), which works either way.",
+  "type": "commonjs"
+}
