@@ -1,7 +1,7 @@
 {
   "name": "scoped",
-  "version": "0.3.0",
-  "description": "MCP coordination layer for concurrent Claude Code fleets — file-level claim/release/check locking backed by local SQLite, with optional async Linear visibility.",
+  "version": "0.4.0",
+  "description": "File claims between concurrent Claude Code sessions, enforced by a PreToolUse hook, with an MCP server for claim, release, check and status.",
   "type": "module",
   "repository": {
     "type": "git",
@@ -12,7 +12,8 @@
     "url": "https://github.com/OrenSegal/scoped/issues"
   },
   "bin": {
-    "scoped": "./src/index.mjs"
+    "scoped": "./bin/scoped",
+    "scoped-mcp": "./bin/scoped-mcp"
   },
   "main": "src/index.mjs",
   "engines": {
@@ -23,7 +24,7 @@
     "dev": "node --watch src/index.mjs",
     "setup": "node scripts/install.mjs",
     "uninstall": "node scripts/uninstall.mjs",
-    "test": "node --test"
+    "test": "node --test \"test/*.test.mjs\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

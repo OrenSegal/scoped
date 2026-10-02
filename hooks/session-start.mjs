@@ -4,18 +4,31 @@
 // (claim/release) that pretool-enforce.mjs uses for automatic PreToolUse enforcement — without
 // this, an explicit claim() and the hook's auto-claim would use different, unmatched identities
 // and the hook would end up blocking a session from files it claimed itself.
+//
+// Idempotent per session: if scoped is registered twice (plugin and ~/.claude/settings.json),
+// both copies fire for the same start; only the first injects. SessionStart also fires on
+// resume, clear and compact, and each of those loses or replaces context, so the dedupe key
+// includes `source` and a later event still re-injects.
+//
+// Also the one place a broken runtime can be reported before the first edit: if node:sqlite
+// is missing, the user is told that edits won't be coordinated.
 
-let input = "";
-for await (const chunk of process.stdin) input += chunk;
+import { validSessionId } from "../src/config.mjs";
+import { firstWithin, readStdin, sqliteProblem } from "../src/runtime.mjs";
 
-let session_id;
+let payload;
 try {
-  ({ session_id } = JSON.parse(input));
+  payload = JSON.parse(await readStdin());
 } catch {
   process.exit(0); // malformed input — say nothing, don't block session start over it
 }
 
-if (!session_id) process.exit(0);
+const { session_id, source = "startup" } = payload ?? {};
+if (!validSessionId(session_id)) {
+  if (session_id) console.error("[scoped] session-start: session_id is not a Claude Code session id; not injecting it");
+  process.exit(0);
+}
+if (!firstWithin(`session-start:${session_id}:${source}`, 60 * 1000)) process.exit(0);
 
 const output = {
   hookSpecificOutput: {
@@ -27,5 +40,8 @@ const output = {
       `will look like a conflict to your own edits.`,
   },
 };
+
+const problem = await sqliteProblem();
+if (problem) output.systemMessage = `scoped: file claims are NOT enforced in this session. ${problem}`;
 
 process.stdout.write(JSON.stringify(output));
