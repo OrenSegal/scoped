@@ -6,6 +6,8 @@ Part of [sous](https://github.com/OrenSegal/sous): tools for checking what codin
 
 scoped stops two Claude Code sessions from editing the same file at the same time: file claims between concurrent sessions, enforced by a `PreToolUse` hook, with an MCP server for `claim`, `release`, `check` and `status`.
 
+**Result.** Racing real OS processes on one file found that concurrent hook calls could let two sessions edit the same file: SQLite had no busy timeout, and the hook ignored the result of its own claim. Both are fixed in [scoped#1](https://github.com/OrenSegal/scoped/pull/1), and `test/concurrency.test.mjs` (8 processes) and the hook race test in `test/hook.test.mjs` (6 processes) now assert exactly one winner per round; both fail against the old code. Write-up: [docs/one-connection-cannot-test-a-race.md](docs/one-connection-cannot-test-a-race.md).
+
 ## Why
 
 Several Claude Code sessions against one codebase is normal now: one per Linear issue, one per worktree, several in the same repo. Nothing stops two of them from editing the same file at once.
@@ -153,7 +155,7 @@ npm install
 npm test
 ```
 
-Tests run the store directly against a temp SQLite file, and the hooks, MCP server, launcher, CLI and setup script as real subprocesses with `HOME`, `SCOPED_HOME` and `CLAUDE_CONFIG_DIR` pointed at temp dirs. `evals/` is a `claude plugin eval` suite, not run in CI because runs are paid. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Tests run the store directly against a temp SQLite file, and the hooks, MCP server, launcher, CLI and setup script as real subprocesses with `HOME`, `SCOPED_HOME` and `CLAUDE_CONFIG_DIR` pointed at temp dirs. `evals/` is a `claude plugin eval` suite, not run in CI because runs are paid. See [CONTRIBUTING.md](CONTRIBUTING.md). [docs/one-connection-cannot-test-a-race.md](docs/one-connection-cannot-test-a-race.md) explains why the race tests use separate processes.
 
 ## License
 
