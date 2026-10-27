@@ -6,7 +6,7 @@ Part of [sous](https://github.com/OrenSegal/sous): tools for checking what codin
 
 scoped stops two Claude Code sessions from editing the same file at the same time: file claims between concurrent sessions, enforced by a `PreToolUse` hook, with an MCP server for `claim`, `release`, `check` and `status`.
 
-**Result.** Racing real OS processes on one file found that concurrent hook calls could let two sessions edit the same file: SQLite had no busy timeout, and the hook ignored the result of its own claim. Both are fixed in [scoped#1](https://github.com/OrenSegal/scoped/pull/1), and `test/concurrency.test.mjs` (8 processes) and the hook race test in `test/hook.test.mjs` (6 processes) now assert exactly one winner per round; both fail against the old code. Write-up: [docs/one-connection-cannot-test-a-race.md](docs/one-connection-cannot-test-a-race.md).
+**Result.** Racing real OS processes on one file, `test/concurrency.test.mjs` (8 processes) and the hook race test in `test/hook.test.mjs` (6 processes) assert exactly one winner per round. Two flaws let two sessions edit the same file, no SQLite busy timeout and a hook that ignores the result of its own claim, and both tests fail against code that has them ([scoped#1](https://github.com/OrenSegal/scoped/pull/1)). Write-up: [docs/one-connection-cannot-test-a-race.md](docs/one-connection-cannot-test-a-race.md).
 
 ## Why
 
