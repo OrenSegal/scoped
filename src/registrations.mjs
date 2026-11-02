@@ -10,8 +10,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export const HOOK_FILES = { SessionStart: "session-start.mjs", PreToolUse: "pretool-enforce.mjs" };
-const HOOK_RE = /[\\/]hooks[\\/](session-start|pretool-enforce)\.mjs\b/;
+export const HOOK_FILES = { SessionStart: "session-start.mjs", SessionEnd: "session-end.mjs", PreToolUse: "pretool-enforce.mjs" };
+const HOOK_RE = /[\\/]hooks[\\/](session-start|session-end|pretool-enforce)\.mjs\b/;
 
 export function claudeDir(env = process.env) {
   return env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
