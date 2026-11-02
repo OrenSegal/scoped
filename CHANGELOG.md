@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.2
 
 - A `claim` on a file the same session already holds moves it to the new issue, so `release` of that issue frees it. Before, after a hook claim, `claim(ENG-1)` then `release(ENG-1)` freed nothing. The hook's own re-claim on the next edit leaves the issue alone.
 - A multi-file `claim` is all or nothing: if another session holds any file, none are claimed.
