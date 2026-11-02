@@ -61,7 +61,7 @@ test("README's configuration table lists exactly the environment variables the c
 test("every plugin hook and the MCP launcher point at a file that exists and runs", () => {
   const hooks = json("hooks/hooks.json").hooks;
   const cmds = Object.values(hooks).flat().flatMap((g) => g.hooks.map((h) => h.command));
-  assert.equal(cmds.length, 2);
+  assert.equal(cmds.length, 3);
   for (const c of cmds) {
     const rel = c.match(/\$\{CLAUDE_PLUGIN_ROOT\}\/(\S+?)"/)?.[1];
     assert.ok(rel && fs.existsSync(path.join(root, rel)), `missing target in: ${c}`);

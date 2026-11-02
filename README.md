@@ -18,7 +18,7 @@ Several Claude Code sessions against one codebase is normal now: one per Linear 
 
 **Tools.** For planning and visibility:
 
-- `claim(issue_id, file_paths, session_id)`: reserve files before a multi-file change, so a conflict shows up before you start.
+- `claim(issue_id, file_paths, session_id)`: reserve files before a multi-file change, so a conflict shows up before you start. All or nothing: if another session holds any of them, none are claimed.
 - `release(issue_id, session_id)`: free claims on completion or handoff instead of waiting for them to expire.
 - `check(file_path)`: is this file claimed, and by whom.
 - `status()`: every active claim, by session and issue.
@@ -27,7 +27,7 @@ Several Claude Code sessions against one codebase is normal now: one per Linear 
 
 **One identity for hook and server.** Claude Code gives an MCP server no session id that matches the one a hook receives. A `SessionStart` hook puts the real `session_id` into the session's context, and `claim`/`release` require it, so an explicit claim and the hook's enforcement agree on the owner and a session is never blocked by its own claim.
 
-**Stale claims expire.** Every read reaps dead claims first. A claim made through the MCP server records the server's pid and dies with it (same host). The hook exits after every call, so its claims have no live pid; they expire by TTL instead, and each edit by the owning session restarts that TTL.
+**Stale claims expire.** Every read reaps dead claims first. A claim made through the MCP server records the server's pid and dies with it (same host). The hook exits after every call, so its claims have no live pid; they expire by TTL instead, and each edit by the owning session restarts that TTL. A `SessionEnd` hook frees everything a session holds when it ends; the TTL covers a session that crashes or is killed before the hook runs.
 
 **Linear is visibility, not the lock.** With `LINEAR_API_KEY` set, explicit `claim`/`release` calls post a comment on the issue. The hook's automatic claims stay local and silent. See [SECURITY.md](SECURITY.md) for what is sent.
 
@@ -40,7 +40,7 @@ claude plugin marketplace add OrenSegal/scoped
 claude plugin install scoped@scoped
 ```
 
-The plugin registers both hooks, the MCP server, the `scoped` CLI (the plugin's `bin/` is on the Bash tool's `PATH`) and the `/scoped:*` slash commands. On first start the MCP launcher installs the server's runtime dependencies into `${CLAUDE_PLUGIN_DATA}/deps/<lockfile hash>/` with `npm ci --omit=dev --ignore-scripts`, in a temp dir that is renamed into place, so it survives plugin updates, works on a read-only plugin directory, and two sessions starting together don't corrupt it. That needs `npm` and the network once. Without them the server does not start and says why on stderr (`/mcp` shows it); the hooks and the CLI need no dependencies and keep enforcing.
+The plugin registers the hooks, the MCP server, the `scoped` CLI (the plugin's `bin/` is on the Bash tool's `PATH`) and the `/scoped:*` slash commands. On first start the MCP launcher installs the server's runtime dependencies into `${CLAUDE_PLUGIN_DATA}/deps/<lockfile hash>/` with `npm ci --omit=dev --ignore-scripts`, in a temp dir that is renamed into place, so it survives plugin updates, works on a read-only plugin directory, and two sessions starting together don't corrupt it. That needs `npm` and the network once. Without them the server does not start and says why on stderr (`/mcp` shows it); the hooks and the CLI need no dependencies and keep enforcing.
 
 ### From a clone
 
@@ -53,7 +53,7 @@ npm install
 npm run setup
 ```
 
-`npm run setup` registers the MCP server at user scope (`claude mcp add scoped --scope user -- node <repo>/bin/scoped-mcp`) and adds the `SessionStart` and `PreToolUse` hooks to the global `~/.claude/settings.json`, written atomically. It is safe to re-run: anything already registered, at any scope or from any checkout path, is left alone. It refuses, changing nothing, when scoped is already installed as a plugin, because every hook would then run twice (`--force` overrides). Restart running sessions afterwards. `npm run uninstall` removes only what setup added.
+`npm run setup` registers the MCP server at user scope (`claude mcp add scoped --scope user -- node <repo>/bin/scoped-mcp`) and adds the `SessionStart`, `SessionEnd` and `PreToolUse` hooks to the global `~/.claude/settings.json`, written atomically. It is safe to re-run: anything already registered, at any scope or from any checkout path, is left alone. It refuses, changing nothing, when scoped is already installed as a plugin, because every hook would then run twice (`--force` overrides). Restart running sessions afterwards. `npm run uninstall` removes only what setup added.
 
 From a clone the CLI is `node bin/scoped`, or `npm link` to put `scoped` on your `PATH`.
 
@@ -74,13 +74,16 @@ MCP server, in your MCP config:
 }
 ```
 
-Hooks, in the global `~/.claude/settings.json` (append to existing `SessionStart`/`PreToolUse` arrays rather than replacing them):
+Hooks, in the global `~/.claude/settings.json` (append to existing `SessionStart`/`SessionEnd`/`PreToolUse` arrays rather than replacing them):
 
 ```json
 {
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "node \"/absolute/path/to/scoped/hooks/session-start.mjs\"", "timeout": 15 }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "node \"/absolute/path/to/scoped/hooks/session-end.mjs\"", "timeout": 15 }] }
     ],
     "PreToolUse": [
       {
@@ -145,7 +148,7 @@ The hook costs one Node process start per edit, tens of milliseconds; the claim 
 - **Case-insensitive file systems, partly.** On macOS an existing file resolves to its on-disk case, so `app.js` and `App.js` are one claim. Two spellings of a file that does not exist yet are two claims until it is created.
 - **Windows is untested.** CI runs Linux and macOS. Claim keys fold drive letter and case on Windows (tested with `path.win32`), and the launcher uses `npm.cmd`, but nobody has run the hooks there. Reports welcome.
 - **Per file, not per region.** Two sessions cannot edit different functions of one file at the same time.
-- **Hook claims expire by TTL.** A session that stops editing a file but keeps running holds it until the TTL runs out or it calls `release`.
+- **Hook claims last as long as the session.** A session that stops editing a file but keeps running holds it until the session ends, the TTL runs out, or it calls `release`. A session that dies without running its `SessionEnd` hook holds its hook claims until the TTL runs out.
 - **Not yet measured on a real fleet.** The claim race is tested with real processes sharing one db (`test/concurrency.test.mjs`, `test/hook.test.mjs`); a count of collisions prevented in real use will be published once there is one.
 
 ## Development

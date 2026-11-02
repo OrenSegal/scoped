@@ -69,7 +69,7 @@ server.tool(
   "Register intent to edit one or more files, scoped to a Linear issue id. Call this BEFORE editing files you " +
     "haven't touched yet in this session — the PreToolUse hook auto-claims files as you edit them, so this is " +
     "mainly for reserving files ahead of time (e.g. before a multi-file refactor) or to check for conflicts early. " +
-    "Returns which files were claimed and which are already held by another session — treat conflicts as " +
+    "All or nothing: if another session holds any of the files, nothing is claimed and they are listed as conflicts. Treat conflicts as " +
     "a signal to coordinate with that session, not to force through.",
   {
     issue_id: ISSUE_ID_SCHEMA.describe("Linear issue identifier (e.g. ENG-123) this work belongs to"),
