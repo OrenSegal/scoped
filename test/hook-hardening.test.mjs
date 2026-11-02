@@ -9,6 +9,7 @@ import { spawn, spawnSync } from "node:child_process";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PRETOOL = path.join(root, "hooks", "pretool-enforce.mjs");
 const SESSION_START = path.join(root, "hooks", "session-start.mjs");
+const SESSION_END = path.join(root, "hooks", "session-end.mjs");
 
 function tmp(prefix = "scoped-hookh-") {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefix)));
@@ -196,4 +197,28 @@ test("session-start on a Node without node:sqlite warns the user that edits are 
   const r = await run(SESSION_START, { session_id: "abc", source: "startup" }, { nodeArgs: ["--no-experimental-sqlite"] });
   assert.equal(r.code, 0);
   assert.match(JSON.parse(r.stdout).systemMessage, /node:sqlite/);
+});
+
+// --- SessionEnd ---
+
+test("session-end releases that session's claims, and only that session's", async () => {
+  const home = tmp();
+  await run(PRETOOL, edit("session-a", "/repo/a.js"), { home });
+  await run(PRETOOL, edit("session-c", "/repo/c.js"), { home });
+  const end = await run(SESSION_END, { session_id: "session-a", reason: "other" }, { home });
+  assert.equal(end.code, 0, end.stderr);
+  assert.equal(end.stdout, "");
+  assert.equal((await run(PRETOOL, edit("session-b", "/repo/a.js"), { home })).stdout, "", "a.js should be free");
+  assert.equal(JSON.parse((await run(PRETOOL, edit("session-b", "/repo/c.js"), { home })).stdout).hookSpecificOutput.permissionDecision, "deny");
+});
+
+test("session-end never fails the end of a session: bad input, a malformed id, a corrupt db", async () => {
+  const home = tmp();
+  fs.mkdirSync(path.join(home, ".scoped"));
+  fs.writeFileSync(path.join(home, ".scoped", "claims.db"), "garbage".repeat(500));
+  for (const payload of ["not json", { session_id: 'x" and more' }, { session_id: "session-a" }]) {
+    const r = await run(SESSION_END, payload, { home });
+    assert.equal(r.code, 0);
+    assert.equal(r.stdout, "");
+  }
 });

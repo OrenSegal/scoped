@@ -93,7 +93,7 @@ export class ClaimStore {
 
   // BEGIN IMMEDIATE takes the write lock up front (waiting out busy_timeout), so everything in
   // fn sees one consistent db: no other process can release or reap a row between our INSERT
-  // and the SELECT that reads back who holds it. It also makes a multi-file claim all-or-nothing.
+  // and the SELECT that reads back who holds it, and a failed claim leaves nothing behind.
   _tx(fn) {
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -128,9 +128,12 @@ export class ClaimStore {
     return [...ttlDead, ...pidDead];
   }
 
-  // Attempts to claim each file path for issueId/sessionId. Returns { claimed: [...], conflicts: [{file_path, held_by}] }.
-  // A file already held by this same sessionId is treated as already-claimed (idempotent), regardless of
-  // issue_id, and its TTL clock restarts: re-claiming a file you own is how you keep it.
+  // Attempts to claim every file path for issueId/sessionId, all or nothing. Returns { claimed: [...], conflicts: [] },
+  // or { claimed: [], conflicts: [{file_path, held_by}] } when another session holds any of them: holding half a
+  // change's files while coordinating over the other half is how two sessions deadlock.
+  // A file already held by this same sessionId is treated as already-claimed (idempotent) and its TTL clock restarts:
+  // re-claiming a file you own is how you keep it. An explicit re-claim also moves the file to issueId, so a later
+  // release(issueId) frees it. The hook's re-claim (pid: null) leaves the issue alone: its issue id is only a default.
   //
   // `pid`: defaults to process.pid (this process, running for as long as the caller runs — true for the
   // long-lived MCP server, whose exit is a real liveness signal). Pass pid: null when the caller is a
@@ -141,35 +144,27 @@ export class ClaimStore {
     return this._tx(() => {
       this._reap();
       const now = Math.floor(Date.now() / 1000);
-      const claimed = [];
+      const select = this.db.prepare(`SELECT issue_id, session_id FROM claims WHERE file_path = ?`);
       const conflicts = [];
-      // ON CONFLICT DO NOTHING keeps check-and-insert to one statement, and the surrounding write
-      // transaction keeps the read-back below consistent with it.
+      for (const fp of keys) {
+        const existing = select.get(fp);
+        if (existing && existing.session_id !== sessionId) {
+          conflicts.push({ file_path: fp, held_by: { issue_id: existing.issue_id, session_id: existing.session_id } });
+        }
+      }
+      if (conflicts.length) return { claimed: [], conflicts };
       const insert = this.db.prepare(`
         INSERT INTO claims (file_path, issue_id, session_id, pid, hostname, claimed_at, ttl_seconds)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_path) DO NOTHING
       `);
-      const select = this.db.prepare(`SELECT issue_id, session_id FROM claims WHERE file_path = ?`);
-      const refresh = this.db.prepare(`UPDATE claims SET claimed_at = ? WHERE file_path = ? AND session_id = ?`);
+      const refresh = this.db.prepare(`UPDATE claims SET claimed_at = ?, issue_id = COALESCE(?, issue_id) WHERE file_path = ? AND session_id = ?`);
       for (const fp of keys) {
-        if (insert.run(fp, issueId, sessionId, pid, HOSTNAME, now, ttlSeconds).changes === 1) {
-          claimed.push(fp);
-          continue;
-        }
-        const existing = select.get(fp);
-        if (!existing) {
-          // Can't happen while we hold the write lock; if it ever does, the file is free.
-          insert.run(fp, issueId, sessionId, pid, HOSTNAME, now, ttlSeconds);
-          claimed.push(fp);
-        } else if (existing.session_id === sessionId) {
-          refresh.run(now, fp, sessionId);
-          claimed.push(fp);
-        } else {
-          conflicts.push({ file_path: fp, held_by: { issue_id: existing.issue_id, session_id: existing.session_id } });
+        if (insert.run(fp, issueId, sessionId, pid, HOSTNAME, now, ttlSeconds).changes !== 1) {
+          refresh.run(now, pid === null ? null : issueId, fp, sessionId);
         }
       }
-      return { claimed, conflicts };
+      return { claimed: keys, conflicts };
     });
   }
 
@@ -203,6 +198,17 @@ export class ClaimStore {
         .map((r) => r.file_path);
       return { session_id: id, released };
     });
+  }
+
+  // Releases every claim held by exactly this session id (the SessionEnd hook). No prefix matching:
+  // a session ending must never free another session's claims.
+  endSession(sessionId) {
+    return this._tx(() =>
+      this.db
+        .prepare(`DELETE FROM claims WHERE session_id = ? RETURNING file_path`)
+        .all(sessionId)
+        .map((r) => r.file_path)
+    );
   }
 
   // Proves the db accepts a write (doctor): inserts a row and rolls it back. Returns the row count.
