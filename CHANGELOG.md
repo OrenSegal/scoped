@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- A `claim` on a file the same session already holds moves it to the new issue, so `release` of that issue frees it. Before, after a hook claim, `claim(ENG-1)` then `release(ENG-1)` freed nothing. The hook's own re-claim on the next edit leaves the issue alone.
+- A multi-file `claim` is all or nothing: if another session holds any file, none are claimed.
+- New `SessionEnd` hook releases that session's claims. Clone installs: re-run `npm run setup`, or `scoped doctor` reports it as not registered.
+
 ## v0.4.1
 
 - `/scoped:status` runs `${CLAUDE_PLUGIN_ROOT}/bin/scoped status` when `scoped` is not on PATH (as in `claude plugin eval` runs), instead of leaving the model to search for it.

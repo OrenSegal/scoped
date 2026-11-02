@@ -117,6 +117,7 @@ test("doctor: plugin only, everything reachable -> all good", () => {
   const r = cli(sb, ["doctor"]);
   assert.equal(r.code, 0, r.out + r.err);
   assert.match(r.out, /ok\s+SessionStart hook registered once \(plugin\)/);
+  assert.match(r.out, /ok\s+SessionEnd hook registered once \(plugin\)/);
   assert.match(r.out, /ok\s+PreToolUse hook registered once \(plugin\)/);
   assert.match(r.out, /ok\s+MCP server registered once \(plugin\)/);
   assert.match(r.out, /ok\s+MCP server answers initialize and tools\/list/);
