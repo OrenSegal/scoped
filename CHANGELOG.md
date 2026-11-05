@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.4.2
+
+- A `claim` on a file the same session already holds moves it to the new issue, so `release` of that issue frees it. Before, after a hook claim, `claim(ENG-1)` then `release(ENG-1)` freed nothing. The hook's own re-claim on the next edit leaves the issue alone.
+- A multi-file `claim` is all or nothing: if another session holds any file, none are claimed.
+- New `SessionEnd` hook releases that session's claims. Clone installs: re-run `npm run setup`, or `scoped doctor` reports it as not registered.
+
+## v0.4.1
+
+- `/scoped:status` runs `${CLAUDE_PLUGIN_ROOT}/bin/scoped status` when `scoped` is not on PATH (as in `claude plugin eval` runs), instead of leaving the model to search for it.
+- `status-shows-claims` eval: the case may load skills, the CLI grader matches `scoped status` or `scoped check` by name or path, and the judge fails answers that come from `ls`, `git`, log files or a failed scoped call.
+
 ## v0.4.0
 
 - Claims key on the canonical path (`src/paths.mjs`: resolved, symlinks and `..` followed through the deepest existing ancestor, case folded on Windows). Before, `/repo/x/../a.js`, a symlinked directory, `/tmp` vs `/private/tmp` on macOS or a different-case spelling were separate keys for one file, and two sessions could both edit it.

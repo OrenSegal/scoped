@@ -47,6 +47,7 @@ test("setup: registers both hooks once with quoted paths, and a re-run adds noth
   const s1 = settingsOf(h);
   assert.deepEqual(hookCommands(s1, "PreToolUse"), [`node "${PRETOOL}"`]);
   assert.equal(hookCommands(s1, "SessionStart").length, 1);
+  assert.equal(hookCommands(s1, "SessionEnd").length, 1);
   assert.equal(s1.hooks.PreToolUse[0].hooks[0].timeout, 15);
 
   const second = run("install.mjs", h);
