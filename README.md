@@ -27,7 +27,7 @@ Several Claude Code sessions against one codebase is normal now: one per Linear 
 
 **One identity for hook and server.** Claude Code gives an MCP server no session id that matches the one a hook receives. A `SessionStart` hook puts the real `session_id` into the session's context, and `claim`/`release` require it, so an explicit claim and the hook's enforcement agree on the owner and a session is never blocked by its own claim.
 
-**Stale claims expire.** Every read reaps dead claims first. A claim made through the MCP server records the server's pid and dies with it (same host). The hook exits after every call, so its claims have no live pid; they expire by TTL instead, and each edit by the owning session restarts that TTL. A `SessionEnd` hook frees everything a session holds when it ends; the TTL covers a session that crashes or is killed before the hook runs.
+**Stale claims expire.** Every read reaps dead claims first. A claim made through the MCP server records the server's pid and dies with it (same host). The hook exits after every call, so its claims have no live pid; they expire by TTL instead (4 hours by default; `claim` takes a `ttl_seconds` override, up to 7 days), and each edit by the owning session restarts that TTL. A `SessionEnd` hook frees everything a session holds when it ends; the TTL covers a session that crashes or is killed before the hook runs.
 
 **Linear is visibility, not the lock.** With `LINEAR_API_KEY` set, explicit `claim`/`release` calls post a comment on the issue. The hook's automatic claims stay local and silent. See [SECURITY.md](SECURITY.md) for what is sent.
 
