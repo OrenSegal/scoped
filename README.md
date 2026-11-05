@@ -1,5 +1,12 @@
 # scoped
 
+> **Moved.** Development of scoped moved to [sous/plugins/scoped](https://github.com/OrenSegal/sous/tree/main/plugins/scoped). The sous copy is the maintained one; this repo is kept for history. Install it from the sous marketplace:
+>
+> ```bash
+> claude plugin marketplace add OrenSegal/sous
+> claude plugin install scoped@sous
+> ```
+
 [![CI](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml/badge.svg)](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
 Part of [sous](https://github.com/OrenSegal/sous): tools for checking what coding agents actually do.
@@ -36,8 +43,8 @@ Several Claude Code sessions against one codebase is normal now: one per Linear 
 ### As a plugin
 
 ```bash
-claude plugin marketplace add OrenSegal/scoped
-claude plugin install scoped@scoped
+claude plugin marketplace add OrenSegal/sous
+claude plugin install scoped@sous
 ```
 
 The plugin registers the hooks, the MCP server, the `scoped` CLI (the plugin's `bin/` is on the Bash tool's `PATH`) and the `/scoped:*` slash commands. On first start the MCP launcher installs the server's runtime dependencies into `${CLAUDE_PLUGIN_DATA}/deps/<lockfile hash>/` with `npm ci --omit=dev --ignore-scripts`, in a temp dir that is renamed into place, so it survives plugin updates, works on a read-only plugin directory, and two sessions starting together don't corrupt it. That needs `npm` and the network once. Without them the server does not start and says why on stderr (`/mcp` shows it); the hooks and the CLI need no dependencies and keep enforcing.
