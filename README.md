@@ -1,5 +1,12 @@
 # scoped
 
+> **Moved.** Development of scoped moved to [sous/plugins/scoped](https://github.com/OrenSegal/sous/tree/main/plugins/scoped). The sous copy is the maintained one; this repo is kept for history. Install it from the sous marketplace:
+>
+> ```bash
+> claude plugin marketplace add OrenSegal/sous
+> claude plugin install scoped@sous
+> ```
+
 [![CI](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml/badge.svg)](https://github.com/OrenSegal/scoped/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 
 Part of [sous](https://github.com/OrenSegal/sous): tools for checking what coding agents actually do.
