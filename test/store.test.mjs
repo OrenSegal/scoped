@@ -118,6 +118,46 @@ test("a claim attempt by a session that doesn't own the file leaves claimed_at a
   assert.equal(after, before);
   store.close();
 });
+
+test("re-claiming a hook-claimed file under a ticket adopts the ticket, so release frees it", () => {
+  const store = tmpStore();
+  store.claim("adhoc:session-", ["/repo/a.js"], "session-a", undefined, undefined, null); // the hook
+  assert.deepEqual(store.claim("ENG-1", ["/repo/a.js"], "session-a").claimed, ["/repo/a.js"]);
+  assert.equal(store.check("/repo/a.js").issue_id, "ENG-1");
+  assert.deepEqual(store.release("ENG-1", "session-a"), ["/repo/a.js"]);
+  assert.equal(store.check("/repo/a.js"), null);
+  store.close();
+});
+
+test("the hook's re-claim on the next edit keeps the ticket an explicit claim gave the file", () => {
+  const store = tmpStore();
+  store.claim("ENG-1", ["/repo/a.js"], "session-a");
+  store.claim("adhoc:session-", ["/repo/a.js"], "session-a", undefined, undefined, null);
+  assert.deepEqual(store.release("ENG-1", "session-a"), ["/repo/a.js"]);
+  store.close();
+});
+
+test("a multi-file claim with one conflict claims nothing", () => {
+  const store = tmpStore();
+  store.claim("ENG-1", ["/repo/held.js"], "session-a");
+  const result = store.claim("ENG-2", ["/repo/free.js", "/repo/held.js"], "session-b");
+  assert.deepEqual(result.claimed, []);
+  assert.deepEqual(result.conflicts.map((c) => c.file_path), ["/repo/held.js"]);
+  assert.equal(store.check("/repo/free.js"), null);
+  store.close();
+});
+
+test("endSession() frees only the exact session, across issues", () => {
+  const store = tmpStore();
+  store.claim("ENG-1", ["/repo/a.js"], "session-a");
+  store.claim("ENG-2", ["/repo/b.js"], "session-a");
+  store.claim("ENG-3", ["/repo/c.js"], "session-ab");
+  assert.deepEqual(store.endSession("session-a").sort(), ["/repo/a.js", "/repo/b.js"]);
+  assert.deepEqual(store.endSession("session"), []); // never treated as a prefix
+  assert.ok(store.check("/repo/c.js"));
+  store.close();
+});
+
 test("status() returns a fleet-wide snapshot of every active claim", () => {
   const store = tmpStore();
   store.claim("ENG-1", ["/repo/a.js"], "session-a");
